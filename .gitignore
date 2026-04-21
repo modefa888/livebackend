@@ -1,0 +1,9 @@
+node_modules
+backups
+log
+package-lock.json
+.env
+.env.*
+!.env.example
+sql
+*.sql
