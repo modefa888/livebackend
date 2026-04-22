@@ -1105,4 +1105,65 @@ router.post('/search/logs', authenticateToken, async (req, res) => {
     }
   });
 
+  // 停止单个机器人
+  router.post('/botguard/stop/:botName', authenticateToken, verifyAdmin, async (req, res) => {
+    try {
+      const { botName } = req.params;
+      const { getBotGuard } = require('../services/bot/bot-guard');
+      const botGuard = getBotGuard();
+      
+      const result = await botGuard.stopBotByName(botName);
+      
+      if (result) {
+        res.status(200).json({ success: true, message: `${botName} 已停止` });
+      } else {
+        res.status(400).json({ success: false, message: `停止 ${botName} 失败` });
+      }
+    } catch (error) {
+      res.status(500).json({ message: '停止机器人失败', error: error.message });
+    }
+  });
+
+  // 启动单个机器人
+  router.post('/botguard/start/:botName', authenticateToken, verifyAdmin, async (req, res) => {
+    try {
+      const { botName } = req.params;
+      const { getBotGuard } = require('../services/bot/bot-guard');
+      const botGuard = getBotGuard();
+      
+      const result = await botGuard.startBotByName(botName);
+      
+      if (result) {
+        res.status(200).json({ success: true, message: `${botName} 启动成功` });
+      } else {
+        res.status(400).json({ success: false, message: `启动 ${botName} 失败` });
+      }
+    } catch (error) {
+      res.status(500).json({ message: '启动机器人失败', error: error.message });
+    }
+  });
+
+  // 设置机器人自动重启
+  router.post('/botguard/autorestart/:botName', authenticateToken, verifyAdmin, async (req, res) => {
+    try {
+      const { botName } = req.params;
+      const { enabled } = req.body;
+      const { getBotGuard } = require('../services/bot/bot-guard');
+      const botGuard = getBotGuard();
+      
+      const result = botGuard.setBotAutoRestart(botName, enabled);
+      
+      if (result) {
+        res.status(200).json({ 
+          success: true, 
+          message: `${botName} 自动重启已${enabled ? '启用' : '禁用'}` 
+        });
+      } else {
+        res.status(400).json({ success: false, message: `未知的机器人名称: ${botName}` });
+      }
+    } catch (error) {
+      res.status(500).json({ message: '设置自动重启失败', error: error.message });
+    }
+  });
+
 module.exports = router;

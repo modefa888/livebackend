@@ -15,6 +15,10 @@ class BotGuard {
     this.healthCheckIntervalMs = 30000; // 30秒检查一次
     this.autoRestartIntervalMs = 60000; // 1分钟检查一次
     this.restartBackoff = 0;
+    this.disabledBots = {
+      livebot: false, // 是否禁用自动重启
+      fabubot: false  // 是否禁用自动重启
+    };
   }
 
   // 启动守护服务
@@ -258,19 +262,108 @@ class BotGuard {
       const livebotStatus = getBotStatus();
       const fabuBotStatus = getFabuBotStatus();
 
-      // 检查 LiveBot
-      if (!livebotStatus.isRunning) {
+      // 检查 LiveBot（如果没有被禁用自动重启）
+      if (!livebotStatus.isRunning && !this.disabledBots.livebot) {
         info('⚠️ LiveBot 检测到停止，尝试启动...');
         await this.safeStartBot();
       }
 
-      // 检查 FaBuBot
-      if (!fabuBotStatus.isRunning) {
+      // 检查 FaBuBot（如果没有被禁用自动重启）
+      if (!fabuBotStatus.isRunning && !this.disabledBots.fabubot) {
         info('⚠️ FaBuBot 检测到停止，尝试启动...');
         await this.safeStartFabuBot();
       }
     } catch (err) {
       error('❌ 自动重启检查失败:', err);
+    }
+  }
+
+  // 停止单个机器人
+  async stopBotByName(botName) {
+    try {
+      botName = botName.toLowerCase();
+      
+      if (botName === 'livebot') {
+        info(`🛑 正在手动停止 LiveBot...`);
+        const result = await this.safeStopBot();
+        if (result) {
+          info('✅ LiveBot 已停止');
+        }
+        return result;
+      } else if (botName === 'fabubot') {
+        info(`🛑 正在手动停止 FaBuBot...`);
+        const result = await this.safeStopFabuBot();
+        if (result) {
+          info('✅ FaBuBot 已停止');
+        }
+        return result;
+      } else {
+        error(`❌ 未知的机器人名称: ${botName}`);
+        return false;
+      }
+    } catch (err) {
+      error(`❌ 停止机器人失败:`, err);
+      return false;
+    }
+  }
+
+  // 启动单个机器人
+  async startBotByName(botName) {
+    try {
+      botName = botName.toLowerCase();
+      
+      if (botName === 'livebot') {
+        info(`🔄 正在手动启动 LiveBot...`);
+        const result = await this.safeStartBot();
+        if (result) {
+          info('✅ LiveBot 启动成功');
+        }
+        return result;
+      } else if (botName === 'fabubot') {
+        info(`🔄 正在手动启动 FaBuBot...`);
+        const result = await this.safeStartFabuBot();
+        if (result) {
+          info('✅ FaBuBot 启动成功');
+        }
+        return result;
+      } else {
+        error(`❌ 未知的机器人名称: ${botName}`);
+        return false;
+      }
+    } catch (err) {
+      error(`❌ 启动机器人失败:`, err);
+      return false;
+    }
+  }
+
+  // 禁用/启用机器人自动重启
+  setBotAutoRestart(botName, enabled) {
+    botName = botName.toLowerCase();
+    
+    if (botName === 'livebot') {
+      this.disabledBots.livebot = !enabled;
+      info(`🔧 LiveBot 自动重启 ${enabled ? '已启用' : '已禁用'}`);
+      return true;
+    } else if (botName === 'fabubot') {
+      this.disabledBots.fabubot = !enabled;
+      info(`🔧 FaBuBot 自动重启 ${enabled ? '已启用' : '已禁用'}`);
+      return true;
+    } else {
+      error(`❌ 未知的机器人名称: ${botName}`);
+      return false;
+    }
+  }
+
+  // 获取机器人自动重启状态
+  getBotAutoRestartStatus(botName) {
+    botName = botName.toLowerCase();
+    
+    if (botName === 'livebot') {
+      return !this.disabledBots.livebot;
+    } else if (botName === 'fabubot') {
+      return !this.disabledBots.fabubot;
+    } else {
+      return null;
     }
   }
 
@@ -314,12 +407,14 @@ class BotGuard {
         livebot: {
           ...livebotStatus,
           restartCount: this.livebotRestartCount,
-          lastActive: formatDate(this.livebotLastActive)
+          lastActive: formatDate(this.livebotLastActive),
+          autoRestartEnabled: !this.disabledBots.livebot
         },
         fabuBot: {
           ...fabuBotStatus,
           restartCount: this.fabuBotRestartCount,
-          lastActive: formatDate(this.fabuBotLastActive)
+          lastActive: formatDate(this.fabuBotLastActive),
+          autoRestartEnabled: !this.disabledBots.fabubot
         },
         healthCheckInterval: `${this.healthCheckIntervalMs/1000} 秒`,
         autoRestartInterval: `${this.autoRestartIntervalMs/1000} 秒`,

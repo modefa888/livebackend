@@ -504,11 +504,581 @@ module.exports = async (bot, pool, messageService, mediaHandler, videoHandler, r
             await groupCommandsModule.handleGUnban(msg, args);
           } else if (cleanCmd === 'report') {
             await groupCommandsModule.handleReport(msg);
+          } else if (cleanCmd === 'mediagroups') {
+            await handleMediaGroupsCommand(msg, args);
+          } else if (cleanCmd === 'singlevideos') {
+            await handleSingleVideosCommand(msg, args);
           }
         } catch (err) {
           error(`[faBuBot] 处理 /${cmd.command} 命令失败:`, err);
         }
       });
+    }
+  };
+
+  // 处理多媒体消息查询命令（管理员）
+  const handleMediaGroupsCommand = async (msg, args, callbackQuery = null) => {
+    try {
+      const from = msg.from || callbackQuery.from;
+      const chatId = msg.chat?.id || callbackQuery.message.chat.id;
+      const messageId = callbackQuery?.message.message_id;
+      
+      if (!from) return;
+
+      // 检查是否为管理员
+      const isAdmin = await checkUserAdmin(from.id);
+      if (!isAdmin) {
+        await sendAndSaveMessage(chatId, '抱歉，此命令仅限管理员使用。', {}, msg);
+        return;
+      }
+
+      const page = parseInt(args[0]) || 1;
+      const pageSize = 10;
+      const offset = (page - 1) * pageSize;
+
+      const conn = await pool.getConnection();
+      try {
+        const [mediaGroups] = await conn.execute(
+          `SELECT g.id, g.media_group_id, g.chat_id, g.username, g.message_count, g.created_at, g.forwarded_message_ids, 
+                  (SELECT i.caption FROM fabubot_media_items i WHERE i.media_group_id = g.media_group_id AND i.caption != '' LIMIT 1) as caption
+           FROM fabubot_media_groups g
+           ORDER BY g.created_at DESC 
+           LIMIT ? OFFSET ?`,
+          [pageSize, offset]
+        );
+
+        const [totalResult] = await conn.execute(
+          'SELECT COUNT(*) as total FROM fabubot_media_groups'
+        );
+        const total = totalResult[0].total;
+        const totalPages = Math.ceil(total / pageSize);
+
+        if (mediaGroups.length === 0) {
+          await sendAndSaveMessage(chatId, '暂无多媒体消息记录。', {}, msg);
+          return;
+        }
+
+        let message = `📋 多媒体消息列表 - 第 ${page}/${totalPages} 页\n\n`;
+        mediaGroups.forEach((group, index) => {
+          const caption = group.caption || '无标题';
+          const shortCaption = caption.length > 50 ? caption.substring(0, 50) + '...' : caption;
+          message += `${index + 1 + offset}. ${shortCaption}\n\n`;
+        });
+
+        // 构建 Inline Keyboard - 一行显示5个查看按钮
+        const keyboard = [];
+        let currentRow = [];
+        mediaGroups.forEach((group, index) => {
+          const displayIndex = index + 1 + offset;
+          currentRow.push({
+            text: `📋 ${displayIndex}`,
+            callback_data: `mg_detail_${group.id}`
+          });
+          // 每5个按钮一行
+          if (currentRow.length === 5) {
+            keyboard.push(currentRow);
+            currentRow = [];
+          }
+        });
+        // 添加剩余的按钮
+        if (currentRow.length > 0) {
+          keyboard.push(currentRow);
+        }
+
+        // 添加分页按钮
+        const paginationRow = [];
+        if (page > 1) {
+          paginationRow.push({
+            text: '⬅️ 上一页',
+            callback_data: `mediagroups_${page - 1}`
+          });
+        }
+        if (page < totalPages) {
+          paginationRow.push({
+            text: '下一页 ➡️',
+            callback_data: `mediagroups_${page + 1}`
+          });
+        }
+        if (paginationRow.length > 0) {
+          keyboard.push(paginationRow);
+        }
+
+        if (messageId) {
+          // 编辑现有消息
+          await bot.editMessageText(message, {
+            chat_id: chatId,
+            message_id: messageId,
+            reply_markup: keyboard.length > 0 ? { inline_keyboard: keyboard } : undefined
+          });
+        } else {
+          await sendAndSaveMessage(chatId, message, {
+            reply_markup: {
+              inline_keyboard: keyboard
+            }
+          }, msg);
+        }
+      } finally {
+        conn.release();
+      }
+    } catch (err) {
+      error('[faBuBot] 处理 /mediagroups 命令失败:', err);
+      await sendAndSaveMessage(msg.chat?.id || callbackQuery.message.chat.id, '查询多媒体消息失败，请稍后重试。', {}, msg);
+    }
+  };
+
+  // 查看多媒体消息详情
+  const viewMediaGroupDetail = async (groupId, chatId, messageId) => {
+    const conn = await pool.getConnection();
+    try {
+      const [mediaGroups] = await conn.execute(
+        `SELECT g.id, g.media_group_id, g.chat_id, g.username, g.message_count, g.created_at, g.forwarded_message_ids, 
+                (SELECT i.caption FROM fabubot_media_items i WHERE i.media_group_id = g.media_group_id AND i.caption != '' LIMIT 1) as caption
+         FROM fabubot_media_groups g
+         WHERE g.id = ?`,
+        [groupId]
+      );
+
+      if (mediaGroups.length === 0) {
+        await bot.sendMessage(chatId, '未找到该多媒体消息记录。');
+        return;
+      }
+
+      const group = mediaGroups[0];
+      let message = `📋 多媒体消息详情\n\n`;
+      message += `ID: ${group.id}\n`;
+      message += `媒体组ID: ${group.media_group_id}\n`;
+      message += `聊天ID: ${group.chat_id}\n`;
+      message += `用户名: ${group.username || '-'}\n`;
+      message += `消息数: ${group.message_count}\n`;
+      message += `创建时间: ${new Date(group.created_at).toLocaleString()}\n`;
+      message += `\n标题:\n${group.caption || '无'}`;
+
+      // 解析并显示转发消息ID
+      let keyboard = [
+        [
+          { text: '📤 发送媒体', callback_data: `mg_send_${group.id}` },
+          { text: '🔙 返回列表', callback_data: 'mediagroups_1' }
+        ]
+      ];
+      
+      if (group.forwarded_message_ids) {
+        try {
+          const forwardedData = JSON.parse(group.forwarded_message_ids);
+          const chatIds = Object.keys(forwardedData);
+          
+          if (chatIds.length > 0) {
+            message += `\n\n🔗 跳转链接:\n`;
+            const linkTexts = [];
+            
+            for (const chatIdKey of chatIds) {
+              const messageIds = forwardedData[chatIdKey];
+              // 转换为 Telegram 链接格式
+              let linkChatId = chatIdKey;
+              if (linkChatId.startsWith('-100')) {
+                linkChatId = linkChatId.substring(4); // 去掉 -100
+              }
+              
+              if (Array.isArray(messageIds)) {
+                messageIds.forEach((msgId, index) => {
+                  const url = `https://t.me/c/${linkChatId}/${msgId}`;
+                  linkTexts.push(`[消息${index + 1}](${url})`);
+                });
+              } else if (typeof messageIds === 'number') {
+                const url = `https://t.me/c/${linkChatId}/${messageIds}`;
+                linkTexts.push(`[消息1](${url})`);
+              }
+            }
+            
+            message += linkTexts.join('、');
+          }
+        } catch (e) {
+          message += `\n\n🔗 跳转链接: 解析失败`;
+        }
+      }
+
+      await bot.editMessageText(message, {
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: {
+          inline_keyboard: keyboard
+        },
+        parse_mode: 'Markdown'
+      });
+    } finally {
+      conn.release();
+    }
+  };
+
+  // 发送多媒体消息给用户
+  const sendMediaGroup = async (groupId, chatId) => {
+    const conn = await pool.getConnection();
+    try {
+      const [mediaItems] = await conn.execute(
+        `SELECT file_id, type, caption 
+         FROM fabubot_media_items 
+         WHERE media_group_id = (SELECT media_group_id FROM fabubot_media_groups WHERE id = ?)
+         ORDER BY id`,
+        [groupId]
+      );
+
+      if (mediaItems.length === 0) {
+        await bot.sendMessage(chatId, '未找到该多媒体消息的媒体文件。');
+        return;
+      }
+
+      // 查找第一个非空的 caption
+      const itemWithCaption = mediaItems.find(item => item.caption && item.caption.trim() !== '');
+      let mainCaption = itemWithCaption ? itemWithCaption.caption : '';
+      
+      // 按类型分组媒体文件
+      const photos = mediaItems.filter(item => item.type === 'photo');
+      const videos = mediaItems.filter(item => item.type === 'video');
+      const documents = mediaItems.filter(item => item.type === 'document');
+      const audios = mediaItems.filter(item => item.type === 'audio');
+
+      // 发送媒体组
+      if (photos.length > 0 || videos.length > 0) {
+        const mediaGroup = [];
+        let hasCaption = false;
+        photos.forEach((photo, index) => {
+          const caption = !hasCaption && mainCaption ? mainCaption : '';
+          hasCaption = hasCaption || (caption !== '');
+          mediaGroup.push({
+            type: 'photo',
+            media: photo.file_id,
+            caption: caption
+          });
+        });
+        videos.forEach((video) => {
+          const caption = !hasCaption && mainCaption ? mainCaption : '';
+          hasCaption = hasCaption || (caption !== '');
+          mediaGroup.push({
+            type: 'video',
+            media: video.file_id,
+            caption: caption
+          });
+        });
+
+        try {
+          await bot.sendMediaGroup(chatId, mediaGroup);
+          info(`[faBuBot] 成功发送多媒体消息: ${groupId}`);
+        } catch (err) {
+          error('[faBuBot] 发送多媒体消息失败:', err);
+          if (err.code === 'ETELEGRAM' && err.response && err.response.statusCode === 400) {
+            await bot.sendMessage(chatId, '发送失败：文件ID无效或已过期，请重新获取媒体文件。', {
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: '🗑️ 删除该多媒体消息', callback_data: `mg_delete_${groupId}` }]
+                ]
+              }
+            });
+          } else {
+            await bot.sendMessage(chatId, '发送多媒体消息失败，请稍后重试。');
+          }
+        }
+      } else {
+        // 如果没有图片或视频，单独发送文档或音频
+        let successCount = 0;
+        for (let i = 0; i < mediaItems.length; i++) {
+          const item = mediaItems[i];
+          try {
+            if (item.type === 'document') {
+              await bot.sendDocument(chatId, item.file_id, {
+                caption: i === 0 ? mainCaption : undefined
+              });
+              successCount++;
+            } else if (item.type === 'audio') {
+              await bot.sendAudio(chatId, item.file_id, {
+                caption: i === 0 ? mainCaption : undefined
+              });
+              successCount++;
+            }
+          } catch (err) {
+            error('[faBuBot] 发送媒体文件失败:', err);
+          }
+        }
+        if (successCount > 0) {
+          info(`[faBuBot] 成功发送 ${successCount}/${mediaItems.length} 个媒体文件: ${groupId}`);
+        } else {
+          await bot.sendMessage(chatId, '发送失败：文件ID无效或已过期，请重新获取媒体文件。', {
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '🗑️ 删除该多媒体消息', callback_data: `mg_delete_${groupId}` }]
+              ]
+            }
+          });
+        }
+      }
+    } catch (err) {
+      error('[faBuBot] 发送多媒体消息异常:', err);
+      await bot.sendMessage(chatId, '发送多媒体消息时发生异常，请稍后重试。');
+    } finally {
+      conn.release();
+    }
+  };
+
+  // 删除多媒体消息
+  const deleteMediaGroup = async (groupId, chatId) => {
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      
+      // 获取 media_group_id
+      const [groups] = await conn.execute(
+        'SELECT media_group_id FROM fabubot_media_groups WHERE id = ?',
+        [groupId]
+      );
+      
+      if (groups.length === 0) {
+        await bot.sendMessage(chatId, '未找到该多媒体消息记录。');
+        return;
+      }
+      
+      const mediaGroupId = groups[0].media_group_id;
+      
+      // 删除关联的媒体项
+      await conn.execute(
+        'DELETE FROM fabubot_media_items WHERE media_group_id = ?',
+        [mediaGroupId]
+      );
+      
+      // 删除媒体组
+      await conn.execute(
+        'DELETE FROM fabubot_media_groups WHERE id = ?',
+        [groupId]
+      );
+      
+      await conn.commit();
+      
+      info(`[faBuBot] 删除多媒体消息成功: ${groupId}`);
+      await bot.sendMessage(chatId, '✅ 已成功删除该多媒体消息及所有关联文件。');
+    } catch (err) {
+      await conn.rollback();
+      error('[faBuBot] 删除多媒体消息失败:', err);
+      await bot.sendMessage(chatId, '删除失败，请稍后重试。');
+    } finally {
+      conn.release();
+    }
+  };
+
+  // 处理单视频消息查询命令（管理员）
+  const handleSingleVideosCommand = async (msg, args, callbackQuery = null) => {
+    try {
+      const from = msg.from || callbackQuery.from;
+      const chatId = msg.chat?.id || callbackQuery.message.chat.id;
+      const messageId = callbackQuery?.message.message_id;
+      
+      if (!from) return;
+
+      // 检查是否为管理员
+      const isAdmin = await checkUserAdmin(from.id);
+      if (!isAdmin) {
+        await sendAndSaveMessage(chatId, '抱歉，此命令仅限管理员使用。', {}, msg);
+        return;
+      }
+
+      const page = parseInt(args[0]) || 1;
+      const pageSize = 10;
+      const offset = (page - 1) * pageSize;
+
+      const conn = await pool.getConnection();
+      try {
+        const [videos] = await conn.execute(
+          `SELECT id, file_id, chat_id, user_id, duration, mime_type, timestamp, caption, forwarded_message_id, forwarded_message_ids 
+           FROM fabubot_single_videos 
+           ORDER BY timestamp DESC 
+           LIMIT ? OFFSET ?`,
+          [pageSize, offset]
+        );
+
+        const [totalResult] = await conn.execute(
+          'SELECT COUNT(*) as total FROM fabubot_single_videos'
+        );
+        const total = totalResult[0].total;
+        const totalPages = Math.ceil(total / pageSize);
+
+        if (videos.length === 0) {
+          await sendAndSaveMessage(chatId, '暂无单视频消息记录。', {}, msg);
+          return;
+        }
+
+        let message = `🎬 单视频消息列表 - 第 ${page}/${totalPages} 页\n\n`;
+        videos.forEach((video, index) => {
+          const caption = video.caption || '无标题';
+          const shortCaption = caption.length > 50 ? caption.substring(0, 50) + '...' : caption;
+          message += `${index + 1 + offset}. ${shortCaption}\n\n`;
+        });
+
+        // 构建 Inline Keyboard - 为每个视频添加查看按钮，一行显示5个
+        const keyboard = [];
+        let currentRow = [];
+        videos.forEach((video, index) => {
+          const displayIndex = index + 1 + offset;
+          currentRow.push({
+            text: `📋 ${displayIndex}`,
+            callback_data: `sv_detail_${video.id}`
+          });
+          // 每5个按钮一行
+          if (currentRow.length === 5) {
+            keyboard.push(currentRow);
+            currentRow = [];
+          }
+        });
+        // 添加剩余的按钮
+        if (currentRow.length > 0) {
+          keyboard.push(currentRow);
+        }
+
+        // 添加分页按钮
+        const paginationRow = [];
+        if (page > 1) {
+          paginationRow.push({
+            text: '⬅️ 上一页',
+            callback_data: `singlevideos_${page - 1}`
+          });
+        }
+        if (page < totalPages) {
+          paginationRow.push({
+            text: '下一页 ➡️',
+            callback_data: `singlevideos_${page + 1}`
+          });
+        }
+        if (paginationRow.length > 0) {
+          keyboard.push(paginationRow);
+        }
+
+        if (messageId) {
+          // 编辑现有消息
+          await bot.editMessageText(message, {
+            chat_id: chatId,
+            message_id: messageId,
+            reply_markup: keyboard.length > 0 ? { inline_keyboard: keyboard } : undefined
+          });
+        } else {
+          await sendAndSaveMessage(chatId, message, {
+            reply_markup: {
+              inline_keyboard: keyboard
+            }
+          }, msg);
+        }
+      } finally {
+        conn.release();
+      }
+    } catch (err) {
+      error('[faBuBot] 处理 /singlevideos 命令失败:', err);
+      await sendAndSaveMessage(msg.chat?.id || callbackQuery.message.chat.id, '查询单视频消息失败，请稍后重试。', {}, msg);
+    }
+  };
+
+  // 查看单视频详情
+  const viewSingleVideoDetail = async (videoId, chatId, messageId) => {
+    const conn = await pool.getConnection();
+    try {
+      const [videos] = await conn.execute(
+        `SELECT id, file_id, chat_id, user_id, duration, mime_type, timestamp, caption, forwarded_message_id, forwarded_message_ids 
+         FROM fabubot_single_videos 
+         WHERE id = ?`,
+        [videoId]
+      );
+
+      if (videos.length === 0) {
+        await bot.sendMessage(chatId, '未找到该视频记录。');
+        return;
+      }
+
+      const video = videos[0];
+      let message = `📋 视频详情\n\n`;
+      message += `ID: ${video.id}\n`;
+      message += `文件ID: ${video.file_id}\n`;
+      message += `聊天ID: ${video.chat_id}\n`;
+      message += `用户ID: ${video.user_id}\n`;
+      message += `时长: ${video.duration ? `${video.duration}秒` : '-'}\n`;
+      message += `MIME: ${video.mime_type || '-'}\n`;
+      message += `创建时间: ${new Date(video.timestamp).toLocaleString()}\n`;
+      message += `\n标题:\n${video.caption || '无'}`;
+
+      // 解析并显示转发消息ID
+      if (video.forwarded_message_ids) {
+        try {
+          const forwardedData = JSON.parse(video.forwarded_message_ids);
+          const chatIds = Object.keys(forwardedData);
+          
+          if (chatIds.length > 0) {
+            message += `\n\n🔗 跳转链接:\n`;
+            const linkTexts = [];
+            
+            for (const chatIdKey of chatIds) {
+              const messageIds = forwardedData[chatIdKey];
+              let linkChatId = chatIdKey;
+              if (linkChatId.startsWith('-100')) {
+                linkChatId = linkChatId.substring(4);
+              }
+              
+              if (Array.isArray(messageIds)) {
+                messageIds.forEach((msgId, index) => {
+                  const url = `https://t.me/c/${linkChatId}/${msgId}`;
+                  linkTexts.push(`[消息${index + 1}](${url})`);
+                });
+              } else if (typeof messageIds === 'number') {
+                const url = `https://t.me/c/${linkChatId}/${messageIds}`;
+                linkTexts.push(`[消息1](${url})`);
+              }
+            }
+            
+            message += linkTexts.join('、');
+          }
+        } catch (e) {
+          message += `\n\n🔗 跳转链接: 解析失败`;
+        }
+      }
+
+      await bot.editMessageText(message, {
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '📤 发送视频', callback_data: `sv_send_${video.id}` },
+              { text: '🔙 返回列表', callback_data: 'singlevideos_1' }
+            ]
+          ]
+        },
+        parse_mode: 'Markdown'
+      });
+    } finally {
+      conn.release();
+    }
+  };
+
+  // 发送单视频给用户
+  const sendSingleVideo = async (videoId, chatId) => {
+    const conn = await pool.getConnection();
+    try {
+      const [videos] = await conn.execute(
+        `SELECT file_id, caption 
+         FROM fabubot_single_videos 
+         WHERE id = ?`,
+        [videoId]
+      );
+
+      if (videos.length === 0) {
+        await bot.sendMessage(chatId, '未找到该视频记录。');
+        return;
+      }
+
+      const video = videos[0];
+      
+      try {
+        await bot.sendVideo(chatId, video.file_id, {
+          caption: video.caption || undefined
+        });
+        info(`[faBuBot] 成功发送视频: ${videoId}`);
+      } catch (err) {
+        error('[faBuBot] 发送视频失败:', err);
+        await bot.sendMessage(chatId, '发送视频失败，请稍后重试。');
+      }
+    } finally {
+      conn.release();
     }
   };
 
@@ -587,8 +1157,89 @@ module.exports = async (bot, pool, messageService, mediaHandler, videoHandler, r
     }
   });
 
+  // 处理回调查询（按钮点击）
+  bot.on('callback_query', async (callbackQuery) => {
+    try {
+      const data = callbackQuery.data;
+      if (!data) return;
+
+      // 处理多媒体消息分页
+      if (data.startsWith('mediagroups_')) {
+        const page = parseInt(data.split('_')[1]);
+        if (page && page > 0) {
+          await handleMediaGroupsCommand({}, [page], callbackQuery);
+        }
+        await bot.answerCallbackQuery(callbackQuery.id);
+        return;
+      }
+
+      // 处理多媒体消息详情查看
+      if (data.startsWith('mg_detail_')) {
+        const groupId = parseInt(data.split('_')[2]);
+        if (groupId && groupId > 0) {
+          await viewMediaGroupDetail(groupId, callbackQuery.message.chat.id, callbackQuery.message.message_id);
+        }
+        await bot.answerCallbackQuery(callbackQuery.id);
+        return;
+      }
+
+      // 处理多媒体消息发送
+      if (data.startsWith('mg_send_')) {
+        const groupId = parseInt(data.split('_')[2]);
+        if (groupId && groupId > 0) {
+          await sendMediaGroup(groupId, callbackQuery.message.chat.id);
+        }
+        await bot.answerCallbackQuery(callbackQuery.id);
+        return;
+      }
+
+      // 处理多媒体消息删除
+      if (data.startsWith('mg_delete_')) {
+        const groupId = parseInt(data.split('_')[2]);
+        if (groupId && groupId > 0) {
+          await deleteMediaGroup(groupId, callbackQuery.message.chat.id);
+        }
+        await bot.answerCallbackQuery(callbackQuery.id);
+        return;
+      }
+
+      // 处理单视频消息分页
+      if (data.startsWith('singlevideos_')) {
+        const page = parseInt(data.split('_')[1]);
+        if (page && page > 0) {
+          await handleSingleVideosCommand({}, [page], callbackQuery);
+        }
+        await bot.answerCallbackQuery(callbackQuery.id);
+        return;
+      }
+
+      // 处理单视频详情查看
+      if (data.startsWith('sv_detail_')) {
+        const videoId = parseInt(data.split('_')[2]);
+        if (videoId && videoId > 0) {
+          await viewSingleVideoDetail(videoId, callbackQuery.message.chat.id, callbackQuery.message.message_id);
+        }
+        await bot.answerCallbackQuery(callbackQuery.id);
+        return;
+      }
+
+      // 处理单视频发送
+      if (data.startsWith('sv_send_')) {
+        const videoId = parseInt(data.split('_')[2]);
+        if (videoId && videoId > 0) {
+          await sendSingleVideo(videoId, callbackQuery.message.chat.id);
+        }
+        await bot.answerCallbackQuery(callbackQuery.id);
+        return;
+      }
+    } catch (err) {
+      error('[faBuBot] 处理回调查询失败:', err);
+    }
+  });
+
   // 加载并注册命令
   info('[faBuBot] 开始加载并注册命令...');
+  
   const enabledCommands = await loadEnabledCommands();
   await registerAllCommands(enabledCommands);
   
