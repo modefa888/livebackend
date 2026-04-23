@@ -312,14 +312,16 @@ class SystemManager {
         success: true,
         message: '代理访问外部网站成功',
         status: response.status,
-        proxyUrl: proxyUrl
+        proxyUrl: proxyUrl,
+        testUrl: 'http://www.baidu.com'
       };
     } catch (error) {
       return {
         success: false,
         message: '代理连接失败',
         error: error.message,
-        proxyUrl: proxyUrl
+        proxyUrl: proxyUrl,
+        testUrl: 'http://www.baidu.com'
       };
     }
   }

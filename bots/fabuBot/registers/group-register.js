@@ -116,40 +116,178 @@ module.exports = (bot, pool, messageService) => {
     }
   };
 
-  // 处理 /addgroup 命令
+  // 处理 /addgroup 命令 - 添加群组（私聊命令）
   const handleAddGroupCommand = async (msg) => {
     try {
-      info(`[faBuBot] 收到 /addgroup 命令: 群组ID=${msg.chat.id}, 用户ID=${msg.from.id}`);
+      info(`[faBuBot] 收到 /addgroup 命令: 用户ID=${msg.from?.id}`);
       
-      if (!msg.chat || (!msg.chat.id.toString().startsWith('-') && msg.chat.type !== 'channel')) {
-        await messageService.sendText(msg.chat.id, '❌ 此命令只能在群组或频道中使用！', {}, msg);
+      if (msg.chat.type !== 'private') {
+        await messageService.sendText(msg.chat.id, '❌ 此命令只能在私聊中使用！', {}, msg);
         return;
       }
       
-      // 保存群组信息
-      await saveGroup(msg.chat);
+      const botInfo = await bot.getMe();
+      const botUsername = botInfo.username;
       
-      // 记录操作日志
-      await logGroupAction(msg.chat.id, 'user_join', msg.from?.id, msg.from?.id, {
-        action: 'add_group',
-        chat_type: msg.chat.type
-      }, msg.message_id);
+      const inviteUrl = `https://t.me/${botUsername}?startgroup=true`;
       
-      // 构建响应消息
-      let response = '✅ 群组已成功添加到管理！\n\n';
-      response += `📋 群组信息：\n`;
-      response += `• 群组ID: ${msg.chat.id}\n`;
-      response += `• 群组名称: ${msg.chat.title || '未命名'}\n`;
-      if (msg.chat.username) {
-        response += `• 群组用户名: @${msg.chat.username}\n`;
-      }
-      response += `• 群组类型: ${msg.chat.type}\n`;
+      const message = "🤖 添加群组到管理\n" +
+          "\n" +
+          "将机器人邀请到您的群组，它会自动识别并添加到管理！\n" +
+          "\n" +
+          "操作步骤：\n" +
+          "1. 点击下方按钮获取邀请链接\n" +
+          "2. 在群组设置中添加机器人为管理员\n" +
+          "3. 机器人会自动检测并保存群组信息\n" +
+          "\n" +
+          "💡 提示：添加后可点击下方按钮查看已管理的群组";
+      
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: '👁️‍🗨 查看已管理群组', callback_data: 'showMyGroups_' + msg.chat.id },
+            { text: '➕ 邀请机器人', url: inviteUrl }
+          ]
+        ]
+      };
+      
+      await bot.sendMessage(msg.chat.id, message, {
+        parse_mode: 'Markdown',
+        reply_markup: JSON.stringify(keyboard)
+      });
       
       info('[faBuBot] /addgroup 命令处理完成');
-      
-      await messageService.sendText(msg.chat.id, response, {}, msg);
     } catch (err) {
       error('[faBuBot] 处理 /addgroup 命令失败:', err);
+      if (msg.chat?.id) {
+        await messageService.sendText(msg.chat.id, '❌ 处理命令失败，请稍后重试！', {}, msg);
+      }
+    }
+  };
+
+  // 处理查看已管理群组回调
+  const handleShowMyGroups = async (chatId, messageId = null) => {
+    try {
+      const conn = await pool.getConnection();
+      try {
+        const [rows] = await conn.execute(
+          `SELECT * FROM fabubot_groups WHERE group_type IN ('group', 'supergroup') ORDER BY created_at DESC`
+        );
+        
+        if (rows.length === 0) {
+          await bot.sendMessage(chatId, '📭 暂未管理任何群组\n\n请将机器人添加到群组并设置为管理员，机器人会自动识别！');
+          return;
+        }
+        
+        let message = `👥 已管理的群组列表 (共 ${rows.length} 个)\n\n`;
+        let keyboard = { inline_keyboard: [] };
+        
+        rows.forEach((group, index) => {
+          message += `${index + 1}. ${group.group_title || '未命名'} (${group.group_type})\n`;
+          message += `   ID: ${group.group_id}\n\n`;
+          
+          keyboard.inline_keyboard.push([
+            {
+              text: `管理 ${group.group_title || '未命名'}`,
+              callback_data: `manageGroup_${group.group_id}`
+            }
+          ]);
+        });
+        
+        message += '您可以在管理后台查看和管理这些群组：\n';
+        message += 'http://localhost:3003/bot';
+        
+        if (messageId) {
+          try {
+            await bot.editMessageText(message, {
+              chat_id: chatId,
+              message_id: messageId,
+              parse_mode: 'Markdown',
+              reply_markup: JSON.stringify(keyboard)
+            });
+          } catch (err) {
+            if (err.message.includes('message can\'t be edited')) {
+              await bot.sendMessage(chatId, message, {
+                parse_mode: 'Markdown',
+                reply_markup: JSON.stringify(keyboard)
+              });
+            } else {
+              error('[faBuBot] 修改消息失败:', err);
+            }
+          }
+        } else {
+          await bot.sendMessage(chatId, message, {
+            parse_mode: 'Markdown',
+            reply_markup: JSON.stringify(keyboard)
+          });
+        }
+      } finally {
+        conn.release();
+      }
+    } catch (err) {
+      error('[faBuBot] 处理查看群组回调失败:', err);
+    }
+  };
+
+  // 处理群组管理回调
+  const handleManageGroup = async (chatId, messageId, groupId) => {
+    try {
+      const conn = await pool.getConnection();
+      try {
+        const [rows] = await conn.execute(
+          `SELECT * FROM fabubot_groups WHERE group_id = ?`,
+          [groupId]
+        );
+        
+        if (rows.length === 0) {
+          await bot.answerCallbackQuery(query.id, {
+            text: '群组不存在！',
+            show_alert: true
+          });
+          return;
+        }
+        
+        const group = rows[0];
+        let message = `📋 群组管理：${group.group_title || '未命名'}\n\n`;
+        message += `类型：${group.group_type}\n`;
+        message += `ID：${group.group_id}\n`;
+        message += `状态：${group.is_enabled ? '正常' : '已禁用'}\n`;
+        if (group.group_username) {
+          message += `用户名：@${group.group_username}\n`;
+        }
+        message += `添加时间：${group.created_at ? group.created_at.toLocaleString() : '未知'}\n`;
+        
+        let keyboard = { inline_keyboard: [] };
+        
+        keyboard.inline_keyboard.push([
+          {
+            text: '返回群组列表',
+            callback_data: 'backToGroupList'
+          }
+        ]);
+        
+        try {
+          await bot.editMessageText(message, {
+            chat_id: chatId,
+            message_id: messageId,
+            parse_mode: 'Markdown',
+            reply_markup: JSON.stringify(keyboard)
+          });
+        } catch (err) {
+          if (err.message.includes('message can\'t be edited')) {
+            await bot.sendMessage(chatId, message, {
+              parse_mode: 'Markdown',
+              reply_markup: JSON.stringify(keyboard)
+            });
+          } else {
+            error('[faBuBot] 修改消息失败:', err);
+          }
+        }
+      } finally {
+        conn.release();
+      }
+    } catch (err) {
+      error('[faBuBot] 处理群组管理回调失败:', err);
     }
   };
 
@@ -183,6 +321,8 @@ module.exports = (bot, pool, messageService) => {
     saveGroupMember,
     logGroupAction,
     handleAddGroupCommand,
-    autoSaveGroupAndMember
+    autoSaveGroupAndMember,
+    handleShowMyGroups,
+    handleManageGroup
   };
 };

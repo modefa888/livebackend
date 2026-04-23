@@ -51,12 +51,29 @@ router.post('/start', authenticateToken, verifyAdmin, async (req, res) => {
     const { startFabuBot } = require('../../bots/fabuBot/bot');
     const result = await startFabuBot();
     
+    // 保存启动记录
+    const db = require('../config/db');
+    const config = await getFaBuBotConfig();
+    const proxy = config.PROXY_HOST && config.PROXY_PORT ? `http://${config.PROXY_HOST.replace(/^https?:\/\//, '')}:${config.PROXY_PORT}` : null;
+    await db.execute(
+      'INSERT INTO fabubot_startup_records (success, error, createdBy, environment, appName, proxy) VALUES (?, ?, ?, ?, ?, ?)',
+      [result, result ? null : '启动失败', req.user.username, config.environment || 'production', 'faBuBot', proxy]
+    );
+    
     if (result) {
       res.status(200).json({ success: true, message: 'faBuBot 启动成功' });
     } else {
       res.status(400).json({ success: false, message: 'faBuBot 启动失败，请检查 FABU_TELEGRAM_TOKEN 配置' });
     }
   } catch (error) {
+    // 保存失败记录
+    const db = require('../config/db');
+    const config = await getFaBuBotConfig();
+    const proxy = config.PROXY_HOST && config.PROXY_PORT ? `http://${config.PROXY_HOST.replace(/^https?:\/\//, '')}:${config.PROXY_PORT}` : null;
+    await db.execute(
+      'INSERT INTO fabubot_startup_records (success, error, createdBy, environment, appName, proxy) VALUES (?, ?, ?, ?, ?, ?)',
+      [false, error.message, req.user.username, config.environment || 'production', 'faBuBot', proxy]
+    );
     res.status(500).json({ message: '启动 faBuBot 失败', error: error.message });
   }
 });
@@ -1658,6 +1675,21 @@ router.post('/groups/:groupId/reports/:reportId/dismiss', authenticateToken, ver
   } catch (error) {
     console.error('[faBuBot API] 驳回举报失败:', error);
     res.status(500).json({ message: '驳回举报失败', error: error.message });
+  }
+});
+
+// 获取启动记录
+router.get('/startup-records', authenticateToken, async (req, res) => {
+  try {
+    const db = require('../config/db');
+    
+    const [records] = await db.execute(
+      'SELECT id, timestamp, success, error, createdBy, environment, appName, proxy FROM fabubot_startup_records ORDER BY timestamp DESC LIMIT 50'
+    );
+    
+    res.status(200).json({ records });
+  } catch (error) {
+    res.status(500).json({ message: '获取启动记录失败', error: error.message });
   }
 });
 

@@ -1,4 +1,5 @@
 const groupRegister = require('./group-register');
+const channelRegister = require('./channel-register');
 const groupCommands = require('../commands/group-commands');
 const groupFeatures = require('./group-features');
 const { info, error, warn, logCommand, logMessage, logGroupAction } = require('../utils/logger.js');
@@ -8,7 +9,11 @@ module.exports = async (bot, pool, messageService, mediaHandler, videoHandler, r
   
   // 初始化群组管理模块
   const groupRegisterModule = groupRegister(bot, pool, messageService);
-  const { saveGroup, saveGroupMember, logGroupAction, handleAddGroupCommand, autoSaveGroupAndMember } = groupRegisterModule;
+  const { saveGroup, saveGroupMember, logGroupAction, handleAddGroupCommand, autoSaveGroupAndMember, handleShowMyGroups, handleManageGroup } = groupRegisterModule;
+
+  // 初始化频道管理模块
+  const channelRegisterModule = channelRegister(bot, pool, messageService);
+  const { handleAddChannelCommand, handleListChannelsCommand, autoSaveChannel, handleMyChatMember, handleShowMyChannels, handleManageChannel } = channelRegisterModule;
 
   // 初始化群组命令模块
   const groupCommandsModule = groupCommands(bot, pool, messageService, groupRegisterModule);
@@ -17,6 +22,7 @@ module.exports = async (bot, pool, messageService, mediaHandler, videoHandler, r
   const groupFeaturesModule = groupFeatures(bot, pool, messageService, groupRegisterModule);
   
   info('[faBuBot] 群组管理模块初始化完成');
+  info('[faBuBot] 频道管理模块初始化完成');
 
   // 保存或更新用户信息的函数（使用原子操作避免竞态条件）
   const saveUser = async (msg) => {
@@ -397,7 +403,6 @@ module.exports = async (bot, pool, messageService, mediaHandler, videoHandler, r
       bot.onText(commandPattern, async (msg) => {
         try {
           const from = msg.from;
-          if (!from) return;
           
           // 额外检查：确保命令完全匹配（处理带@机器人名的命令）
           let receivedCommand = msg.text.split(' ')[0].substring(1);
@@ -413,8 +418,13 @@ module.exports = async (bot, pool, messageService, mediaHandler, videoHandler, r
           // 保存命令消息
           await saveIncomingMessage(msg);
           
-          // 保存用户信息
-          await saveUser(msg);
+          // 保存用户信息（频道消息的 from 可能为 null）
+          if (from) {
+            await saveUser(msg);
+          }
+          
+          // 群组和私聊消息需要 from（频道消息已在 message 事件中过滤）
+          if (!from) return;
           
           // 检查命令权限
           const permission = await checkCommandPermission(msg);
@@ -508,6 +518,10 @@ module.exports = async (bot, pool, messageService, mediaHandler, videoHandler, r
             await handleMediaGroupsCommand(msg, args);
           } else if (cleanCmd === 'singlevideos') {
             await handleSingleVideosCommand(msg, args);
+          } else if (cleanCmd === 'addchannel') {
+            await handleAddChannelCommand(msg);
+          } else if (cleanCmd === 'listchannels') {
+            await handleListChannelsCommand(msg);
           }
         } catch (err) {
           error(`[faBuBot] 处理 /${cmd.command} 命令失败:`, err);
@@ -1085,13 +1099,25 @@ module.exports = async (bot, pool, messageService, mediaHandler, videoHandler, r
   // 处理新成员加入
   bot.on('new_chat_members', async (msg) => {
     try {
-      info(`[faBuBot] 新成员加入: 群组ID=${msg.chat.id}, 新成员数=${msg.new_chat_members.length}`);
+      info(`[faBuBot] 新成员加入: 聊天ID=${msg.chat.id}, 类型=${msg.chat.type}, 新成员数=${msg.new_chat_members.length}`);
       
-      await autoSaveGroupAndMember(msg);
-      await groupFeaturesModule.handlePreJoinCheck(msg);
-      await groupFeaturesModule.handleNewMember(msg);
+      // 只处理群组的新成员加入，频道使用 my_chat_member 事件处理
+      if (msg.chat.type === 'group' || msg.chat.type === 'supergroup') {
+        await autoSaveGroupAndMember(msg);
+        await groupFeaturesModule.handlePreJoinCheck(msg);
+        await groupFeaturesModule.handleNewMember(msg);
+      }
     } catch (err) {
       error('[faBuBot] 处理新成员加入失败:', err);
+    }
+  });
+
+  // 处理机器人在聊天中的状态变化（频道管理）
+  bot.on('my_chat_member', async (msg) => {
+    try {
+      await handleMyChatMember(msg);
+    } catch (err) {
+      error('[faBuBot] 处理 my_chat_member 事件失败:', err);
     }
   });
 
@@ -1111,19 +1137,37 @@ module.exports = async (bot, pool, messageService, mediaHandler, videoHandler, r
     try {
       const from = msg.from;
       
-      info(`[faBuBot] 收到消息: 聊天ID=${msg.chat.id}, 用户ID=${from?.id}, 消息ID=${msg.message_id}`);
+      info(`[faBuBot] 收到消息: 聊天ID=${msg.chat.id}, 类型=${msg.chat.type}, 用户ID=${from?.id}, 消息ID=${msg.message_id}`);
 
       // 先尝试处理服务消息
       if (msg.chat.type === 'group' || msg.chat.type === 'supergroup') {
         await groupFeaturesModule.handleServiceMessage(msg);
       }
-
-      if (!from) return;
+      
+      // 自动保存频道信息
+      if (msg.chat.type === 'channel') {
+        await autoSaveChannel(msg);
+      }
 
       // 如果是新成员或离开消息，已经被上面的处理器处理了
       if (msg.new_chat_members || msg.left_chat_member) {
         return;
       }
+      
+      // 如果是频道消息，单独处理（频道消息的 from 通常是 null）
+      if (msg.chat.type === 'channel') {
+        // 频道中只处理命令消息
+        if (msg.text && msg.text.startsWith('/')) {
+          // 保存消息记录
+          await saveIncomingMessage(msg);
+          // 检查并处理命令（命令处理由 onText 监听器处理）
+        }
+        // 频道消息不处理普通消息，只处理命令
+        return;
+      }
+      
+      // 群组和私聊消息需要 from
+      if (!from) return;
       
       // 保存用户消息（但不保存命令消息，因为会在onText中单独处理）
       if (!msg.text || !msg.text.startsWith('/')) {
@@ -1229,6 +1273,60 @@ module.exports = async (bot, pool, messageService, mediaHandler, videoHandler, r
         if (videoId && videoId > 0) {
           await sendSingleVideo(videoId, callbackQuery.message.chat.id);
         }
+        await bot.answerCallbackQuery(callbackQuery.id);
+        return;
+      }
+
+      // 处理查看已管理频道回调
+      if (data.startsWith('showMyChannels_')) {
+        const chatId = parseInt(data.split('_')[1]);
+        if (chatId) {
+          await handleShowMyChannels(chatId);
+        }
+        await bot.answerCallbackQuery(callbackQuery.id);
+        return;
+      }
+
+      // 处理频道管理回调
+      if (data.startsWith('manageChannel_')) {
+        const channelId = data.split('_')[1];
+        if (channelId) {
+          await handleManageChannel(callbackQuery.message.chat.id, callbackQuery.message.message_id, channelId);
+        }
+        await bot.answerCallbackQuery(callbackQuery.id);
+        return;
+      }
+
+      // 处理返回频道列表回调
+      if (data === 'backToChannelList') {
+        await handleShowMyChannels(callbackQuery.message.chat.id, callbackQuery.message.message_id);
+        await bot.answerCallbackQuery(callbackQuery.id);
+        return;
+      }
+
+      // 处理查看已管理群组回调
+      if (data.startsWith('showMyGroups_')) {
+        const chatId = parseInt(data.split('_')[1]);
+        if (chatId) {
+          await handleShowMyGroups(chatId);
+        }
+        await bot.answerCallbackQuery(callbackQuery.id);
+        return;
+      }
+
+      // 处理群组管理回调
+      if (data.startsWith('manageGroup_')) {
+        const groupId = data.split('_')[1];
+        if (groupId) {
+          await handleManageGroup(callbackQuery.message.chat.id, callbackQuery.message.message_id, groupId);
+        }
+        await bot.answerCallbackQuery(callbackQuery.id);
+        return;
+      }
+
+      // 处理返回群组列表回调
+      if (data === 'backToGroupList') {
+        await handleShowMyGroups(callbackQuery.message.chat.id, callbackQuery.message.message_id);
         await bot.answerCallbackQuery(callbackQuery.id);
         return;
       }

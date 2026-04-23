@@ -13,6 +13,7 @@ const douyinFDOperations = require('./tables/douyinFD');
 const liveHistoryOperations = require('./tables/liveHistory');
 const modulePermissionsOperations = require('./tables/modulePermissions');
 const monitorStatsOperations = require('./tables/monitorStats');
+const botGuardSettingsOperations = require('./tables/botGuardSettings');
 
 let pool = null;
 let isInitialized = false;
@@ -36,6 +37,7 @@ const initialize = async () => {
         liveHistoryOperations.setPool(pool, $);
         modulePermissionsOperations.setPool(pool, $);
         monitorStatsOperations.setPool(pool, $);
+        botGuardSettingsOperations.setPool(pool, $);
         
         isInitialized = true;
     } catch (error) {
@@ -118,4 +120,5 @@ module.exports = {
     ...liveHistoryOperations,
     ...modulePermissionsOperations,
     ...monitorStatsOperations,
+    ...botGuardSettingsOperations,
 };

@@ -1151,7 +1151,7 @@ router.post('/search/logs', authenticateToken, async (req, res) => {
       const { getBotGuard } = require('../services/bot/bot-guard');
       const botGuard = getBotGuard();
       
-      const result = botGuard.setBotAutoRestart(botName, enabled);
+      const result = await botGuard.setBotAutoRestart(botName, enabled);
       
       if (result) {
         res.status(200).json({ 
@@ -1163,6 +1163,59 @@ router.post('/search/logs', authenticateToken, async (req, res) => {
       }
     } catch (error) {
       res.status(500).json({ message: '设置自动重启失败', error: error.message });
+    }
+  });
+
+  // 获取守护服务配置
+  router.get('/botguard/config', authenticateToken, async (req, res) => {
+    try {
+      const { getBotGuard } = require('../services/bot/bot-guard');
+      const botGuard = getBotGuard();
+      const configs = await botGuard.getBotConfigs();
+      res.status(200).json({ success: true, configs });
+    } catch (error) {
+      res.status(500).json({ message: '获取守护服务配置失败', error: error.message });
+    }
+  });
+
+  // 更新守护服务配置
+  router.put('/botguard/config/:botName', authenticateToken, verifyAdmin, async (req, res) => {
+    try {
+      const { botName } = req.params;
+      const config = req.body;
+      const { getBotGuard } = require('../services/bot/bot-guard');
+      const botGuard = getBotGuard();
+      
+      const result = await botGuard.updateBotConfig(botName, config);
+      
+      if (result) {
+        res.status(200).json({ 
+          success: true, 
+          message: `${botName} 配置更新成功` 
+        });
+      } else {
+        res.status(400).json({ success: false, message: `更新 ${botName} 配置失败` });
+      }
+    } catch (error) {
+      res.status(500).json({ message: '更新守护服务配置失败', error: error.message });
+    }
+  });
+
+  // 重置重启计数
+  router.post('/botguard/reset-counts', authenticateToken, verifyAdmin, async (req, res) => {
+    try {
+      const { getBotGuard } = require('../services/bot/bot-guard');
+      const botGuard = getBotGuard();
+      
+      const result = await botGuard.resetRestartCounts();
+      
+      if (result) {
+        res.status(200).json({ success: true, message: '重启计数已重置' });
+      } else {
+        res.status(400).json({ success: false, message: '重置重启计数失败' });
+      }
+    } catch (error) {
+      res.status(500).json({ message: '重置重启计数失败', error: error.message });
     }
   });
 
