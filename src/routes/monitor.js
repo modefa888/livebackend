@@ -6,11 +6,11 @@ const db = require('../config/db');
 // 中间件：验证JWT令牌
 const authenticateToken = async (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
-  
+
   if (!token) {
     return res.status(401).json({ message: '未提供认证令牌' });
   }
-  
+
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
     req.user = decoded;
@@ -19,6 +19,25 @@ const authenticateToken = async (req, res, next) => {
     return res.status(401).json({ message: '无效的认证令牌' });
   }
 };
+
+// 获取监控频率设置 - 必须在 /:type 之前定义
+router.get('/interval', authenticateToken, async (req, res) => {
+  const { type } = req.query;
+
+  if (!type || (type !== 'live' && type !== 'spider')) {
+    return res.status(400).json({ message: '无效的监控类型' });
+  }
+
+  try {
+    res.status(200).json({
+      success: true,
+      interval: 5
+    });
+  } catch (error) {
+    console.error('获取监控频率设置错误:', error.message);
+    res.status(500).json({ message: '服务器内部错误' });
+  }
+});
 
 // 获取监控统计数据
 router.get('/stats', authenticateToken, async (req, res) => {
@@ -39,11 +58,10 @@ router.get('/stats', authenticateToken, async (req, res) => {
 // 获取监控状态
 router.get('/:type', authenticateToken, async (req, res) => {
   const { type } = req.params;
-  
+
   try {
     switch (type) {
       case 'live':
-        // 模拟直播监控数据
         const [vtbs] = await db.execute('SELECT * FROM vtbs');
         const liveCount = vtbs.filter(vtb => vtb.liveStatus === '1').length;
         res.status(200).json({
@@ -61,7 +79,6 @@ router.get('/:type', authenticateToken, async (req, res) => {
         });
         break;
       case 'system':
-        // 模拟系统监控数据
         res.status(200).json({
           isRunning: true,
           systemInfo: {
@@ -86,7 +103,6 @@ router.get('/:type', authenticateToken, async (req, res) => {
         });
         break;
       case 'spider':
-        // 模拟爬虫监控数据
         res.status(200).json({
           isRunning: true,
           totalCount: 27,
@@ -111,9 +127,8 @@ router.get('/:type', authenticateToken, async (req, res) => {
 // 启动监控
 router.post('/start', authenticateToken, async (req, res) => {
   const { type } = req.body;
-  
+
   try {
-    // 模拟启动监控
     console.log(`启动${type}监控`);
     res.status(200).json({ message: '监控启动成功' });
   } catch (error) {
@@ -125,9 +140,8 @@ router.post('/start', authenticateToken, async (req, res) => {
 // 停止监控
 router.post('/stop', authenticateToken, async (req, res) => {
   const { type } = req.body;
-  
+
   try {
-    // 模拟停止监控
     console.log(`停止${type}监控`);
     res.status(200).json({ message: '监控停止成功' });
   } catch (error) {
@@ -139,33 +153,12 @@ router.post('/stop', authenticateToken, async (req, res) => {
 // 设置监控频率
 router.post('/interval', authenticateToken, async (req, res) => {
   const { type, minutes } = req.body;
-  
+
   try {
-    // 模拟设置监控频率
     console.log(`设置${type}监控频率为${minutes}分钟`);
     res.status(200).json({ message: '监控频率设置成功' });
   } catch (error) {
     console.error('设置监控频率错误:', error.message);
-    res.status(500).json({ message: '服务器内部错误' });
-  }
-});
-
-// 获取监控频率设置
-router.get('/interval', authenticateToken, async (req, res) => {
-  const { type } = req.query;
-  
-  if (!type || (type !== 'live' && type !== 'spider')) {
-    return res.status(400).json({ message: '无效的监控类型' });
-  }
-  
-  try {
-    // 模拟获取监控频率设置
-    res.status(200).json({
-      success: true,
-      interval: 5
-    });
-  } catch (error) {
-    console.error('获取监控频率设置错误:', error.message);
     res.status(500).json({ message: '服务器内部错误' });
   }
 });

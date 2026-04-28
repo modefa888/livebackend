@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 const db = require('../../config/db');
 
 class SystemManager {
@@ -44,6 +45,36 @@ class SystemManager {
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  // 压缩文件（gzip）
+  async compressFile(inputPath) {
+    return new Promise((resolve, reject) => {
+      const outputPath = inputPath + '.gz';
+      
+      const readStream = fs.createReadStream(inputPath);
+      const writeStream = fs.createWriteStream(outputPath);
+      const gzip = zlib.createGzip();
+      
+      readStream.pipe(gzip).pipe(writeStream);
+      
+      writeStream.on('finish', () => {
+        const stats = fs.statSync(outputPath);
+        resolve({
+          success: true,
+          compressedPath: outputPath,
+          compressedSize: stats.size
+        });
+      });
+      
+      writeStream.on('error', (error) => {
+        reject(error);
+      });
+      
+      readStream.on('error', (error) => {
+        reject(error);
+      });
+    });
   }
 
   // 备份数据库
@@ -111,10 +142,10 @@ class SystemManager {
       const fileStats = fs.statSync(backupFilePath);
       const fileSize = fileStats.size;
 
-      // 记录备份信息到数据库
+      // 记录备份信息到数据库（数据库备份不压缩）
       await db.execute(
-        'INSERT INTO backup_records (backupFileName, backupPath, fileSize, createdBy) VALUES (?, ?, ?, ?)',
-        [backupFileName, backupFilePath, fileSize, createdBy]
+        'INSERT INTO backup_records (backupFileName, backupPath, fileSize, createdBy, type) VALUES (?, ?, ?, ?, ?)',
+        [backupFileName, backupFilePath, fileSize, createdBy, 'database']
       );
 
       console.log(`数据库备份完成: ${backupFilePath}`);

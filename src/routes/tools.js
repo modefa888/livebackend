@@ -252,7 +252,7 @@ router.get('/system/backup-records', authenticateToken, verifyAdmin, async (req,
   try {
     const { limit = 50 } = req.query;
     const [records] = await db.execute(
-      'SELECT id, backupFileName, backupPath, fileSize, backupTime, createdBy FROM backup_records ORDER BY backupTime DESC LIMIT ?',
+      'SELECT id, backupFileName, backupPath, fileSize, backupTime, createdBy, type, compressedFileName, compressedPath, compressedSize FROM backup_records ORDER BY backupTime DESC LIMIT ?',
       [limit]
     );
     res.status(200).json(records);
@@ -265,22 +265,59 @@ router.get('/system/backup-records', authenticateToken, verifyAdmin, async (req,
 router.get('/system/backup/:id', authenticateToken, verifyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const { type = 'auto' } = req.query;
+
     const [records] = await db.execute(
-      'SELECT backupFileName, backupPath FROM backup_records WHERE id = ?',
+      'SELECT backupFileName, backupPath, fileSize, type as backupType, compressedFileName, compressedPath, compressedSize FROM backup_records WHERE id = ?',
       [id]
     );
-    
+
     if (records.length === 0) {
       return res.status(404).json({ message: '备份文件不存在' });
     }
-    
-    const { backupFileName, backupPath } = records[0];
-    
-    if (!fs.existsSync(backupPath)) {
-      return res.status(404).json({ message: '备份文件不存在' });
+
+    const { backupFileName, backupPath, backupType, compressedFileName, compressedPath } = records[0];
+
+    let downloadPath, downloadName;
+
+    if (type === 'compressed') {
+      if (!compressedPath || !fs.existsSync(compressedPath)) {
+        return res.status(404).json({ message: '压缩文件不存在' });
+      }
+      downloadPath = compressedPath;
+      downloadName = compressedFileName;
+    } else if (type === 'original') {
+      if (!fs.existsSync(backupPath)) {
+        return res.status(404).json({ message: '备份文件不存在' });
+      }
+      downloadPath = backupPath;
+      downloadName = backupFileName;
+    } else {
+      if (backupType === 'database' || backupFileName.endsWith('.sql')) {
+        if (!fs.existsSync(backupPath)) {
+          return res.status(404).json({ message: '备份文件不存在' });
+        }
+        downloadPath = backupPath;
+        downloadName = backupFileName;
+      } else {
+        if (compressedPath && fs.existsSync(compressedPath)) {
+          downloadPath = compressedPath;
+          downloadName = compressedFileName;
+        } else if (fs.existsSync(backupPath)) {
+          downloadPath = backupPath;
+          downloadName = backupFileName;
+        } else {
+          return res.status(404).json({ message: '备份文件不存在' });
+        }
+      }
     }
+
+    const mimeType = require('mime-types').lookup(downloadPath) || 'application/octet-stream';
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(downloadName)}`);
+    res.setHeader('Content-Type', mimeType);
     
-    res.download(backupPath, backupFileName);
+    const fileStream = fs.createReadStream(downloadPath);
+    fileStream.pipe(res);
   } catch (error) {
     res.status(500).json({ message: '下载备份文件失败', error: error.message });
   }
@@ -291,13 +328,11 @@ router.get('/system/code-backup-records', authenticateToken, verifyAdmin, async 
   try {
     const { limit = 50 } = req.query;
     
-    // 从数据库获取备份记录
     const [records] = await db.execute(
       'SELECT id, backupFileName, backupPath, fileSize, backupTime, createdBy FROM backup_records ORDER BY backupTime DESC LIMIT ?',
       [limit]
     );
     
-    // 处理记录，添加类型字段
     const backupRecords = records.map(record => {
       let type = '数据库';
       if (record.backupFileName.startsWith('备份') && !record.backupFileName.startsWith('前端备份')) {
@@ -400,9 +435,7 @@ router.post('/system/update-backend', authenticateToken, verifyAdmin, upload.arr
     const backendDir = path.join(__dirname, '..', '..');
     const uploadedFiles = [];
     
-    // 处理每个上传的文件
     for (const file of files) {
-      // 构建目标文件路径
       const targetPath = path.join(backendDir, file.originalname);
       
       if (shouldExcludeBackend(targetPath, backendDir)) {
@@ -410,18 +443,15 @@ router.post('/system/update-backend', authenticateToken, verifyAdmin, upload.arr
         continue;
       }
       
-      // 确保目标目录存在
       const targetDir = path.dirname(targetPath);
       if (!fs.existsSync(targetDir)) {
         fs.mkdirSync(targetDir, { recursive: true });
       }
       
-      // 移动文件到目标位置
       fs.renameSync(file.path, targetPath);
       uploadedFiles.push(file.originalname);
     }
     
-    // 清理临时目录
     const tempDir = path.join(__dirname, '../temp');
     if (fs.existsSync(tempDir)) {
       fs.rmSync(tempDir, { recursive: true, force: true });
@@ -433,7 +463,6 @@ router.post('/system/update-backend', authenticateToken, verifyAdmin, upload.arr
       files: uploadedFiles
     });
   } catch (error) {
-    // 清理临时文件
     if (req.files) {
       for (const file of req.files) {
         if (fs.existsSync(file.path)) {
@@ -442,7 +471,6 @@ router.post('/system/update-backend', authenticateToken, verifyAdmin, upload.arr
       }
     }
     
-    // 清理临时目录
     const tempDir = path.join(__dirname, '../temp');
     if (fs.existsSync(tempDir)) {
       fs.rmSync(tempDir, { recursive: true, force: true });
@@ -505,7 +533,6 @@ router.get('/system/scan-frontend', authenticateToken, verifyAdmin, async (req, 
     const files = [];
     const excludedFiles = [];
     
-    // 递归扫描目录
     const scanDirectory = (dir, relativePath = '') => {
       const items = fs.readdirSync(dir, { withFileTypes: true });
       
@@ -519,10 +546,8 @@ router.get('/system/scan-frontend', authenticateToken, verifyAdmin, async (req, 
         }
         
         if (item.isDirectory()) {
-          // 递归扫描子目录
           scanDirectory(itemPath, itemRelativePath);
         } else {
-          // 获取文件信息
           const stats = fs.statSync(itemPath);
           files.push({
             path: itemRelativePath,
@@ -533,7 +558,6 @@ router.get('/system/scan-frontend', authenticateToken, verifyAdmin, async (req, 
       }
     };
     
-    // 开始扫描
     scanDirectory(frontendDir);
     
     res.status(200).json({
@@ -553,12 +577,10 @@ router.post('/system/backup-backend', authenticateToken, verifyAdmin, async (req
     const backendDir = path.join(__dirname, '..', '..');
     const backupsDir = path.join(backendDir, 'backups');
     
-    // 确保备份目录存在
     if (!fs.existsSync(backupsDir)) {
       fs.mkdirSync(backupsDir, { recursive: true });
     }
     
-    // 生成备份文件名：备份+北京时间戳
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -570,7 +592,6 @@ router.post('/system/backup-backend', authenticateToken, verifyAdmin, async (req
     const backupName = `后端备份${timestamp}`;
     const backupPath = path.join(backupsDir, backupName);
     
-    // 开始备份
     let totalSize = 0;
     
     const copyDirectory = (dir, relativePath = '') => {
@@ -581,7 +602,6 @@ router.post('/system/backup-backend', authenticateToken, verifyAdmin, async (req
         const itemRelativePath = path.join(relativePath, item.name);
         const destPath = path.join(backupPath, itemRelativePath);
         
-        // 检查是否需要排除
         if (shouldExcludeBackend(itemPath, backendDir)) {
           continue;
         }
@@ -605,11 +625,34 @@ router.post('/system/backup-backend', authenticateToken, verifyAdmin, async (req
     
     copyDirectory(backendDir);
     
-    // 保存备份记录到数据库
+    const compressedFileName = backupName + '.zip';
+    const compressedPath = path.join(backupsDir, compressedFileName);
+    
+    await new Promise((resolve, reject) => {
+      const archiver = require('archiver');
+      const output = fs.createWriteStream(compressedPath);
+      const archive = archiver('zip', { zlib: { level: 9 } });
+      
+      output.on('close', () => {
+        resolve();
+      });
+      
+      archive.on('error', (err) => {
+        reject(err);
+      });
+      
+      archive.pipe(output);
+      archive.directory(backupPath, backupName);
+      archive.finalize();
+    });
+    
+    const compressedStats = fs.statSync(compressedPath);
+    const compressedSize = compressedStats.size;
+    
     try {
       await db.execute(
-        'INSERT INTO backup_records (backupFileName, backupPath, fileSize, createdBy) VALUES (?, ?, ?, ?)',
-        [backupName, backupPath, totalSize, req.user.username]
+        'INSERT INTO backup_records (backupFileName, backupPath, fileSize, createdBy, type, compressedFileName, compressedPath, compressedSize) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [backupName, backupPath, totalSize, req.user.username, 'backend', compressedFileName, compressedPath, compressedSize]
       );
     } catch (dbError) {
       console.error('保存备份记录失败:', dbError);
@@ -619,7 +662,9 @@ router.post('/system/backup-backend', authenticateToken, verifyAdmin, async (req
       success: true,
       message: '后端代码备份成功',
       backupPath: backupPath,
-      backupSize: totalSize
+      backupSize: totalSize,
+      compressedPath: compressedPath,
+      compressedSize: compressedSize
     });
   } catch (error) {
     res.status(500).json({ success: false, message: '备份后端代码失败', error: error.message });
@@ -632,7 +677,6 @@ router.post('/system/backup-both', authenticateToken, verifyAdmin, async (req, r
     const backendDir = path.join(__dirname, '..', '..');
     const frontendDir = path.join(backendDir, '..', 'frontend');
     
-    // 备份后端
     const backendBackupsDir = path.join(backendDir, 'backups');
     if (!fs.existsSync(backendBackupsDir)) {
       fs.mkdirSync(backendBackupsDir, { recursive: true });
@@ -682,17 +726,39 @@ router.post('/system/backup-both', authenticateToken, verifyAdmin, async (req, r
     
     copyBackendDirectory(backendDir);
     
-    // 保存后端备份记录到数据库
+    const backendCompressedFileName = backendBackupName + '.zip';
+    const backendCompressedPath = path.join(backendBackupsDir, backendCompressedFileName);
+    
+    await new Promise((resolve, reject) => {
+      const archiver = require('archiver');
+      const output = fs.createWriteStream(backendCompressedPath);
+      const archive = archiver('zip', { zlib: { level: 9 } });
+      
+      output.on('close', () => {
+        resolve();
+      });
+      
+      archive.on('error', (err) => {
+        reject(err);
+      });
+      
+      archive.pipe(output);
+      archive.directory(backendBackupPath, backendBackupName);
+      archive.finalize();
+    });
+    
+    const backendCompressedStats = fs.statSync(backendCompressedPath);
+    const backendCompressedSize = backendCompressedStats.size;
+    
     try {
       await db.execute(
-        'INSERT INTO backup_records (backupFileName, backupPath, fileSize, createdBy) VALUES (?, ?, ?, ?)',
-        [backendBackupName, backendBackupPath, backendTotalSize, req.user.username]
+        'INSERT INTO backup_records (backupFileName, backupPath, fileSize, createdBy, type, compressedFileName, compressedPath, compressedSize) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [backendBackupName, backendBackupPath, backendTotalSize, req.user.username, 'backend', backendCompressedFileName, backendCompressedPath, backendCompressedSize]
       );
     } catch (dbError) {
       console.error('保存后端备份记录失败:', dbError);
     }
     
-    // 备份前端
     const frontendBackupsDir = path.join(frontendDir, 'backups');
     if (!fs.existsSync(frontendBackupsDir)) {
       fs.mkdirSync(frontendBackupsDir, { recursive: true });
@@ -734,11 +800,34 @@ router.post('/system/backup-both', authenticateToken, verifyAdmin, async (req, r
     
     copyFrontendDirectory(frontendDir);
     
-    // 保存前端备份记录到数据库
+    const frontendCompressedFileName = frontendBackupName + '.zip';
+    const frontendCompressedPath = path.join(frontendBackupsDir, frontendCompressedFileName);
+    
+    await new Promise((resolve, reject) => {
+      const archiver = require('archiver');
+      const output = fs.createWriteStream(frontendCompressedPath);
+      const archive = archiver('zip', { zlib: { level: 9 } });
+      
+      output.on('close', () => {
+        resolve();
+      });
+      
+      archive.on('error', (err) => {
+        reject(err);
+      });
+      
+      archive.pipe(output);
+      archive.directory(frontendBackupPath, frontendBackupName);
+      archive.finalize();
+    });
+    
+    const frontendCompressedStats = fs.statSync(frontendCompressedPath);
+    const frontendCompressedSize = frontendCompressedStats.size;
+    
     try {
       await db.execute(
-        'INSERT INTO backup_records (backupFileName, backupPath, fileSize, createdBy) VALUES (?, ?, ?, ?)',
-        [frontendBackupName, frontendBackupPath, frontendTotalSize, req.user.username]
+        'INSERT INTO backup_records (backupFileName, backupPath, fileSize, createdBy, type, compressedFileName, compressedPath, compressedSize) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [frontendBackupName, frontendBackupPath, frontendTotalSize, req.user.username, 'frontend', frontendCompressedFileName, frontendCompressedPath, frontendCompressedSize]
       );
     } catch (dbError) {
       console.error('保存前端备份记录失败:', dbError);
@@ -749,11 +838,15 @@ router.post('/system/backup-both', authenticateToken, verifyAdmin, async (req, r
       message: '前后端代码备份成功',
       backendBackup: {
         backupPath: backendBackupPath,
-        backupSize: backendTotalSize
+        backupSize: backendTotalSize,
+        compressedPath: backendCompressedPath,
+        compressedSize: backendCompressedSize
       },
       frontendBackup: {
         backupPath: frontendBackupPath,
-        backupSize: frontendTotalSize
+        backupSize: frontendTotalSize,
+        compressedPath: frontendCompressedPath,
+        compressedSize: frontendCompressedSize
       }
     });
   } catch (error) {
@@ -768,12 +861,10 @@ router.post('/system/backup-frontend', authenticateToken, verifyAdmin, async (re
     const frontendDir = path.join(backendDir, '..', 'frontend');
     const backupsDir = path.join(frontendDir, 'backups');
     
-    // 确保备份目录存在
     if (!fs.existsSync(backupsDir)) {
       fs.mkdirSync(backupsDir, { recursive: true });
     }
     
-    // 生成备份文件名：备份+北京时间戳
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -818,11 +909,34 @@ router.post('/system/backup-frontend', authenticateToken, verifyAdmin, async (re
     
     copyDirectory(frontendDir);
     
-    // 保存备份记录到数据库
+    const compressedFileName = backupName + '.zip';
+    const compressedPath = path.join(backupsDir, compressedFileName);
+    
+    await new Promise((resolve, reject) => {
+      const archiver = require('archiver');
+      const output = fs.createWriteStream(compressedPath);
+      const archive = archiver('zip', { zlib: { level: 9 } });
+      
+      output.on('close', () => {
+        resolve();
+      });
+      
+      archive.on('error', (err) => {
+        reject(err);
+      });
+      
+      archive.pipe(output);
+      archive.directory(backupPath, backupName);
+      archive.finalize();
+    });
+    
+    const compressedStats = fs.statSync(compressedPath);
+    const compressedSize = compressedStats.size;
+    
     try {
       await db.execute(
-        'INSERT INTO backup_records (backupFileName, backupPath, fileSize, createdBy) VALUES (?, ?, ?, ?)',
-        [backupName, backupPath, totalSize, req.user.username]
+        'INSERT INTO backup_records (backupFileName, backupPath, fileSize, createdBy, type, compressedFileName, compressedPath, compressedSize) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [backupName, backupPath, totalSize, req.user.username, 'frontend', compressedFileName, compressedPath, compressedSize]
       );
     } catch (dbError) {
       console.error('保存备份记录失败:', dbError);
@@ -832,13 +946,14 @@ router.post('/system/backup-frontend', authenticateToken, verifyAdmin, async (re
       success: true,
       message: '前端代码备份成功',
       backupPath: backupPath,
-      backupSize: totalSize
+      backupSize: totalSize,
+      compressedPath: compressedPath,
+      compressedSize: compressedSize
     });
   } catch (error) {
     res.status(500).json({ success: false, message: '备份前端代码失败', error: error.message });
   }
 });
-
 
 
 // 版本控制相关路由
@@ -852,7 +967,7 @@ const checkGitInitialized = (dir) => {
 // 初始化 Git 仓库
 router.post('/system/git/init', authenticateToken, verifyAdmin, async (req, res) => {
   try {
-    const { type } = req.body; // 'backend' 或 'frontend'
+    const { type } = req.body;
     const rootDir = path.join(__dirname, '..', '..');
     const targetDir = type === 'frontend' 
       ? path.join(rootDir, '..', 'frontend') 
@@ -864,10 +979,8 @@ router.post('/system/git/init', authenticateToken, verifyAdmin, async (req, res)
     
     const { execSync } = require('child_process');
     
-    // 初始化 Git
     execSync('git init', { cwd: targetDir });
     
-    // 创建 .gitignore 文件（使用与备份相同的忽略规则）
     const gitignoreContent = type === 'frontend' 
       ? `node_modules
 backups
@@ -889,7 +1002,6 @@ package-lock.json
     
     fs.writeFileSync(path.join(targetDir, '.gitignore'), gitignoreContent);
     
-    // 首次提交
     execSync('git add .', { cwd: targetDir });
     execSync('git commit -m "Initial commit"', { cwd: targetDir });
     
@@ -902,7 +1014,7 @@ package-lock.json
 // 获取 Git 状态
 router.get('/system/git/status', authenticateToken, verifyAdmin, async (req, res) => {
   try {
-    const { type } = req.query; // 'backend' 或 'frontend'
+    const { type } = req.query;
     const rootDir = path.join(__dirname, '..', '..');
     const targetDir = type === 'frontend' 
       ? path.join(rootDir, '..', 'frontend') 
@@ -914,13 +1026,10 @@ router.get('/system/git/status', authenticateToken, verifyAdmin, async (req, res
     
     const { execSync } = require('child_process');
     
-    // 获取状态
     const status = execSync('git status --porcelain', { cwd: targetDir, encoding: 'utf-8' });
     
-    // 获取当前分支
     const branch = execSync('git branch --show-current', { cwd: targetDir, encoding: 'utf-8' }).trim();
     
-    // 获取最近的提交
     const lastCommit = execSync('git log -1 --pretty=format:"%h - %s (%ar)"', { cwd: targetDir, encoding: 'utf-8' });
     
     res.status(200).json({ 
@@ -1038,7 +1147,6 @@ router.get('/system/git/remote', authenticateToken, verifyAdmin, async (req, res
     try {
       remoteUrl = execSync('git remote get-url origin', { cwd: targetDir, encoding: 'utf-8' }).trim();
     } catch (error) {
-      // 远程仓库未设置
     }
     
     res.status(200).json({ success: true, remoteUrl: remoteUrl });
@@ -1062,13 +1170,11 @@ router.post('/system/git/remote', authenticateToken, verifyAdmin, async (req, re
     
     const { execSync } = require('child_process');
     
-    // 检查是否已存在 origin 远程仓库
     let hasOrigin = false;
     try {
       execSync('git remote get-url origin', { cwd: targetDir });
       hasOrigin = true;
     } catch (error) {
-      // 远程仓库不存在
     }
     
     if (hasOrigin) {
@@ -1098,7 +1204,6 @@ router.post('/system/git/push', authenticateToken, verifyAdmin, async (req, res)
     
     const { execSync } = require('child_process');
     
-    // 先检查是否有远程仓库
     let hasOrigin = false;
     try {
       execSync('git remote get-url origin', { cwd: targetDir });
@@ -1107,10 +1212,8 @@ router.post('/system/git/push', authenticateToken, verifyAdmin, async (req, res)
       return res.status(400).json({ success: false, message: '请先设置远程仓库' });
     }
     
-    // 获取当前分支名称
     const branch = execSync('git branch --show-current', { cwd: targetDir, encoding: 'utf-8' }).trim();
     
-    // 推送
     execSync(`git push -u origin ${branch}`, { cwd: targetDir });
     
     res.status(200).json({ success: true, message: '推送成功' });
@@ -1134,7 +1237,6 @@ router.post('/system/git/pull', authenticateToken, verifyAdmin, async (req, res)
     
     const { execSync } = require('child_process');
     
-    // 先检查是否有远程仓库
     let hasOrigin = false;
     try {
       execSync('git remote get-url origin', { cwd: targetDir });
@@ -1143,7 +1245,6 @@ router.post('/system/git/pull', authenticateToken, verifyAdmin, async (req, res)
       return res.status(400).json({ success: false, message: '请先设置远程仓库' });
     }
     
-    // 拉取
     execSync('git pull', { cwd: targetDir });
     
     res.status(200).json({ success: true, message: '拉取成功' });
@@ -1167,14 +1268,12 @@ router.post('/system/git/rename-branch', authenticateToken, verifyAdmin, async (
     
     const { execSync } = require('child_process');
     
-    // 获取当前分支
     const currentBranch = execSync('git branch --show-current', { cwd: targetDir, encoding: 'utf-8' }).trim();
     
     if (currentBranch === newName) {
       return res.status(200).json({ success: true, message: `分支已为 ${newName}` });
     }
     
-    // 重命名分支
     execSync(`git branch -M ${newName}`, { cwd: targetDir });
     
     res.status(200).json({ 
@@ -1203,13 +1302,11 @@ router.post('/system/git/remove-file', authenticateToken, verifyAdmin, async (re
     
     const { execSync } = require('child_process');
     
-    // 从Git历史中移除文件
     execSync(`git filter-branch --force --index-filter "git rm --cached --ignore-unmatch ${filePath}" --prune-empty --tag-name-filter cat -- --all`, { 
       cwd: targetDir,
       timeout: 60000
     });
     
-    // 如果需要，删除本地文件
     if (alsoDeleteLocal) {
       const fullPath = path.join(targetDir, filePath);
       if (fs.existsSync(fullPath)) {
@@ -1242,34 +1339,26 @@ router.post('/system/git/reset', authenticateToken, verifyAdmin, async (req, res
     const { execSync } = require('child_process');
     const gitDir = path.join(targetDir, '.git');
     
-    // 备份远程URL
     let remoteUrl = '';
     try {
       remoteUrl = execSync('git remote get-url origin', { cwd: targetDir, encoding: 'utf-8' }).trim();
     } catch (e) {
-      // 如果没有远程仓库也没关系
     }
     
-    // 删除.git目录
     if (fs.existsSync(gitDir)) {
       fs.rmSync(gitDir, { recursive: true, force: true });
     }
     
-    // 重新初始化Git
     execSync('git init', { cwd: targetDir });
     
-    // 如果有.gitignore，确保它被添加
     if (fs.existsSync(path.join(targetDir, '.gitignore'))) {
       execSync('git add .gitignore', { cwd: targetDir });
     }
     
-    // 添加所有文件
     execSync('git add .', { cwd: targetDir });
     
-    // 初次提交
     execSync(`git commit -m "${initialCommitMessage}"`, { cwd: targetDir });
     
-    // 如果之前有远程仓库，重新设置
     if (remoteUrl) {
       execSync(`git remote add origin ${remoteUrl}`, { cwd: targetDir });
     }
