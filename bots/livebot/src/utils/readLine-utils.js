@@ -48,8 +48,8 @@ async function searchFiles($, dir, pattern) {
 // 定义要搜索的正则表达式模式
 const pattern = /^\s*\$\.bot\.onText\(/;
 
-// 指定要搜索的文件夹路径
-const dirPath = './src/register/';
+// 指定要搜索的文件夹路径（使用绝对路径，基于当前文件位置）
+const dirPath = path.join(__dirname, '../register/');
 
 module.exports = async function ($) {
     // 调用函数开始搜索

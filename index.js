@@ -37,6 +37,11 @@ const siteInfoRoutes = require('./src/routes/site-info');
 const uploadSiteRoutes = require('./src/routes/upload-site');
 const parseRecordsRoutes = require('./src/routes/parse-records');
 const fabuBotRoutes = require('./src/routes/fabu-bot');
+const spiderApiRoutes = require('./src/routes/spider-api');
+const spiderDynamicRoutes = require('./src/routes/spider-dynamic');
+
+// 导入爬虫接口动态加载器
+const spiderLoader = require('./src/services/spider/spider-loader');
 
 // 导入机器人管理模块
 const { startBot, stopBot, getBotStatus } = require('./bots/livebot/bot');
@@ -94,6 +99,8 @@ app.use('/api/pages', pagesRoutes);
 app.use('/api/site-info', siteInfoRoutes);
 app.use('/api/parse-records', parseRecordsRoutes);
 app.use('/api/fabu-bot', fabuBotRoutes);
+app.use('/api/spider-api', spiderApiRoutes);
+app.use('/spider-api', spiderDynamicRoutes);
 app.use('/', uploadSiteRoutes);
 
 // 根路径
@@ -201,6 +208,14 @@ async function startServer() {
         info('✅ 爬虫管理器初始化完成');
       } catch (spiderError) {
         error('⚠️ 爬虫管理器初始化失败:', spiderError);
+      }
+
+      // 初始化爬虫接口动态加载器
+      try {
+        await spiderLoader.initialize();
+        info('✅ 爬虫接口加载器初始化完成');
+      } catch (spiderApiError) {
+        error('⚠️ 爬虫接口加载器初始化失败:', spiderApiError);
       }
 
       // 启动机器人守护服务
