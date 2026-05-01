@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const { pool } = require('../../bots/fabuBot/config/database');
 const { getFaBuBotConfig, updateFaBuBotConfigs } = require('../../bots/fabuBot/config');
+const { getVodSourceAggregator } = require('../services/vod-source-aggregator');
 
 // 配置multer用于内存存储（不保存到磁盘）
 const storage = multer.memoryStorage();
@@ -1690,6 +1691,365 @@ router.get('/startup-records', authenticateToken, async (req, res) => {
     res.status(200).json({ records });
   } catch (error) {
     res.status(500).json({ message: '获取启动记录失败', error: error.message });
+  }
+});
+
+// =============================================================
+// 影视资源管理相关路由
+// =============================================================
+
+// 获取影视资源列表
+router.get('/vod-sources', authenticateToken, async (req, res) => {
+  try {
+    const conn = await pool.getConnection();
+    try {
+      const { page = 1, pageSize = 20 } = req.query;
+      const offset = (parseInt(page) - 1) * parseInt(pageSize);
+      
+      const [sources] = await conn.execute(
+        'SELECT * FROM fabubot_vod_sources WHERE deleted = 0 ORDER BY CASE WHEN ping IS NULL THEN 1 ELSE 0 END, ping ASC, sort ASC, created_at DESC LIMIT ? OFFSET ?',
+        [parseInt(pageSize), offset]
+      );
+      
+      const [countResult] = await conn.execute('SELECT COUNT(*) as total FROM fabubot_vod_sources WHERE deleted = 0');
+      const total = countResult[0].total;
+      
+      res.status(200).json({ sources, total, page: parseInt(page), pageSize: parseInt(pageSize) });
+    } finally {
+      conn.release();
+    }
+  } catch (error) {
+    res.status(500).json({ message: '获取影视资源列表失败', error: error.message });
+  }
+});
+
+// 获取聚合后的影视资源（去重，只保留最好的源）
+router.get('/vod-sources/aggregated', authenticateToken, async (req, res) => {
+  try {
+    const { limit = 50 } = req.query;
+    const aggregator = getVodSourceAggregator();
+    const sources = await aggregator.getAggregatedSources(parseInt(limit));
+    
+    res.status(200).json({ 
+      success: true, 
+      sources: sources,
+      total: sources.length
+    });
+  } catch (error) {
+    res.status(500).json({ message: '获取聚合影视资源失败', error: error.message });
+  }
+});
+
+// 获取按域名分组的影视资源
+router.get('/vod-sources/by-domain', authenticateToken, async (req, res) => {
+  try {
+    const aggregator = getVodSourceAggregator();
+    const domainGroups = await aggregator.getSourcesByDomain();
+    
+    res.status(200).json({ 
+      success: true, 
+      domainGroups: domainGroups,
+      totalDomains: domainGroups.length
+    });
+  } catch (error) {
+    res.status(500).json({ message: '获取按域名分组的影视资源失败', error: error.message });
+  }
+});
+
+// 获取单个影视资源详情
+router.get('/vod-sources/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const conn = await pool.getConnection();
+    try {
+      const [sources] = await conn.execute(
+        'SELECT * FROM fabubot_vod_sources WHERE id = ? AND deleted = 0',
+        [id]
+      );
+      
+      if (sources.length === 0) {
+        return res.status(404).json({ message: '影视资源不存在' });
+      }
+      
+      res.status(200).json(sources[0]);
+    } finally {
+      conn.release();
+    }
+  } catch (error) {
+    res.status(500).json({ message: '获取影视资源详情失败', error: error.message });
+  }
+});
+
+// 添加影视资源
+router.post('/vod-sources', authenticateToken, verifyAdmin, async (req, res) => {
+  try {
+    const { id, name, url, type = 'vod', category = 'normal', enabled = 1, sort = 0 } = req.body;
+    
+    if (!id || !name || !url) {
+      return res.status(400).json({ message: 'ID、名称和URL不能为空' });
+    }
+    
+    const conn = await pool.getConnection();
+    try {
+      await conn.execute(
+        `INSERT INTO fabubot_vod_sources 
+         (id, name, url, type, category, enabled, sort)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           name = VALUES(name),
+           url = VALUES(url),
+           type = VALUES(type),
+           category = VALUES(category),
+           enabled = VALUES(enabled),
+           sort = VALUES(sort),
+           updated_at = NOW(),
+           deleted = 0`,
+        [id, name, url, type, category, enabled, sort]
+      );
+      
+      res.status(200).json({ success: true, message: '影视资源添加成功' });
+    } finally {
+      conn.release();
+    }
+  } catch (error) {
+    res.status(500).json({ message: '添加影视资源失败', error: error.message });
+  }
+});
+
+// 更新影视资源
+router.put('/vod-sources/:id', authenticateToken, verifyAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, url, type, category, enabled, sort, ping } = req.body;
+    
+    const allowedFields = ['name', 'url', 'type', 'category', 'enabled', 'sort', 'ping'];
+    
+    const fields = [];
+    const values = [];
+    
+    for (const [key, value] of Object.entries(req.body)) {
+      if (allowedFields.includes(key)) {
+        fields.push(`${key} = ?`);
+        values.push(value);
+      }
+    }
+    
+    if (fields.length === 0) {
+      return res.status(400).json({ message: '没有可更新的字段' });
+    }
+    
+    fields.push('updated_at = NOW()');
+    values.push(id);
+    
+    const conn = await pool.getConnection();
+    try {
+      const [result] = await conn.execute(
+        `UPDATE fabubot_vod_sources SET ${fields.join(', ')} WHERE id = ?`,
+        values
+      );
+      
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: '影视资源不存在' });
+      }
+      
+      res.status(200).json({ success: true, message: '影视资源更新成功' });
+    } finally {
+      conn.release();
+    }
+  } catch (error) {
+    res.status(500).json({ message: '更新影视资源失败', error: error.message });
+  }
+});
+
+// 批量更新影视资源排序
+router.put('/vod-sources/sort/batch', authenticateToken, verifyAdmin, async (req, res) => {
+  try {
+    const { sources } = req.body;
+    
+    if (!sources || !Array.isArray(sources) || sources.length === 0) {
+      return res.status(400).json({ message: '参数错误' });
+    }
+    
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      
+      for (const source of sources) {
+        if (source.id && source.sort !== undefined) {
+          await conn.execute(
+            'UPDATE fabubot_vod_sources SET sort = ?, updated_at = NOW() WHERE id = ?',
+            [source.sort, source.id]
+          );
+        }
+      }
+      
+      await conn.commit();
+      res.status(200).json({ success: true, message: '批量排序更新成功' });
+    } catch (error) {
+      await conn.rollback();
+      throw error;
+    } finally {
+      conn.release();
+    }
+  } catch (error) {
+    res.status(500).json({ message: '批量排序更新失败', error: error.message });
+  }
+});
+
+// 删除影视资源（软删除）
+router.delete('/vod-sources/:id', authenticateToken, verifyAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const conn = await pool.getConnection();
+    try {
+      const [result] = await conn.execute(
+        'UPDATE fabubot_vod_sources SET deleted = 1, deleted_at = NOW(), updated_at = NOW() WHERE id = ?',
+        [id]
+      );
+      
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: '影视资源不存在' });
+      }
+      
+      res.status(200).json({ success: true, message: '影视资源删除成功' });
+    } finally {
+      conn.release();
+    }
+  } catch (error) {
+    res.status(500).json({ message: '删除影视资源失败', error: error.message });
+  }
+});
+
+// 测试影视资源延迟（ping）
+router.post('/vod-sources/:id/ping', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const axios = require('axios');
+    
+    const conn = await pool.getConnection();
+    try {
+      const [sources] = await conn.execute(
+        'SELECT * FROM fabubot_vod_sources WHERE id = ? AND deleted = 0',
+        [id]
+      );
+      
+      if (sources.length === 0) {
+        return res.status(404).json({ message: '影视资源不存在' });
+      }
+      
+      const source = sources[0];
+      const startTime = Date.now();
+      
+      try {
+        const response = await axios.get(source.url, {
+          timeout: 10000
+        });
+        
+        const ping = Date.now() - startTime;
+        
+        // 更新ping值和enabled状态
+        await conn.execute(
+          'UPDATE fabubot_vod_sources SET ping = ?, enabled = 1, updated_at = NOW() WHERE id = ?',
+          [ping, id]
+        );
+        
+        res.status(200).json({ 
+          success: true, 
+          ping: ping,
+          enabled: 1,
+          message: `延迟: ${ping}ms`
+        });
+      } catch (fetchError) {
+        const ping = Date.now() - startTime;
+        await conn.execute(
+          'UPDATE fabubot_vod_sources SET ping = ?, enabled = 0, updated_at = NOW() WHERE id = ?',
+          [null, id]
+        );
+        res.status(200).json({ 
+          success: false, 
+          ping: null,
+          enabled: 0,
+          message: `连接失败: ${fetchError.message}`
+        });
+      }
+    } finally {
+      conn.release();
+    }
+  } catch (error) {
+    res.status(500).json({ message: '测试延迟失败', error: error.message });
+  }
+});
+
+// 批量测试影视资源延迟
+router.post('/vod-sources/ping/batch', authenticateToken, verifyAdmin, async (req, res) => {
+  try {
+    const { ids } = req.body;
+    const axios = require('axios');
+    
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: '参数错误' });
+    }
+    
+    const conn = await pool.getConnection();
+    try {
+      // 构建IN子句的占位符
+      const placeholders = ids.map(() => '?').join(',');
+      const [sources] = await conn.execute(
+        `SELECT * FROM fabubot_vod_sources WHERE id IN (${placeholders}) AND deleted = 0`,
+        ids
+      );
+      
+      const results = [];
+      
+      // 并发测试，更快完成
+      const testPromises = sources.map(async (source) => {
+        const startTime = Date.now();
+        let ping = null;
+        let success = false;
+        let message = '';
+        
+        try {
+          const response = await axios.get(source.url, {
+            timeout: 5000  // 5秒超时，更快
+          });
+          
+          ping = Date.now() - startTime;
+          success = true;
+          message = `延迟: ${ping}ms`;
+        } catch (fetchError) {
+          ping = null;
+          success = false;
+          message = `连接失败: ${fetchError.message}`;
+        }
+        
+        // 更新数据库 - 同时更新enabled状态
+        const enabled = success ? 1 : 0;
+        await conn.execute(
+          'UPDATE fabubot_vod_sources SET ping = ?, enabled = ?, updated_at = NOW() WHERE id = ?',
+          [ping, enabled, source.id]
+        );
+        
+        return {
+          id: source.id,
+          name: source.name,
+          ping: ping,
+          success: success,
+          enabled: enabled,
+          message: message
+        };
+      });
+      
+      // 等待所有测试完成
+      const testResults = await Promise.all(testPromises);
+      
+      res.status(200).json({ success: true, results: testResults, message: '批量测试完成' });
+    } finally {
+      conn.release();
+    }
+  } catch (error) {
+    res.status(500).json({ message: '批量测试延迟失败', error: error.message });
   }
 });
 

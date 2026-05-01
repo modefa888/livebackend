@@ -29,6 +29,7 @@
     "mysql2": "^3.20.0",
     "node-cache": "^5.1.2",
     "node-cron": "^3.0.3",
+    "node-fetch": "^3.3.2",
     "node-global-proxy": "^1.0.1",
     "node-telegram-bot-api": "^0.66.0",
     "nodemailer": "^8.0.5",
