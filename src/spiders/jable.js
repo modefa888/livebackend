@@ -48,6 +48,128 @@ const getData = (html) => {
     }
 };
 
+function parseCategories(html) {
+    const $ = cheerio.load(html);
+    const list = [];
+
+    $("#list_categories_video_categories_list .video-img-box").each((index, el) => {
+        const name = $(el).find("h4").text().trim();
+        const totalText = $(el).find(".label").text().trim();
+        const href = $(el).find("a").attr("href") || "";
+        const cover = $(el).find("img").attr("src") || "";
+
+        const slugMatch = href.match(/\/categories\/([^\/]+)\//);
+        const slug = slugMatch ? slugMatch[1] : "";
+
+        const totalVideos = parseInt(totalText.replace(/[^\d]/g, ""), 10) || 0;
+
+        list.push({
+            id: index + 1,
+            name,
+            categoryId: slug,
+            totalVideos,
+            totalText,
+            href,
+            cover
+        });
+    });
+
+    return {
+        title: $("h2").text().trim(),
+        total: list.length,
+        data: list
+    };
+}
+
+router.get('/categories', async (req, res) => {
+
+    const url = `${Host}/categories/?mode=async&function=get_block&block_id=list_categories_video_categories_list&sort_by=total_videos&_=1777459584326`;
+    const key = `${cacheKey}_${url}`;
+
+    console.log(`[jabletv][SEARCH] /categories`);
+
+    try {
+        let data = await get(key);
+        const from = data ? "cache" : "server";
+
+        if (!data) {
+            console.log("[jabletv][SEARCH] 缓存未命中，开始请求（代理优先）");
+
+            const resData = await axiosClient({
+                url,
+                method: "GET",
+                useProxy: true,
+                headers: {
+                    Referer: Host,
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
+                }
+            });
+
+            data = parseCategories(resData.data);
+            updateTime = new Date().toISOString();
+            await set(key, data);
+        }
+
+        res.json({
+            code: 200,
+            message: "获取成功",
+            ...routerInfo,
+            from,
+            total: data.data.length,
+            updateTime,
+            data: data.data
+        });
+    } catch (err) {
+        console.error("[jabletv][SEARCH_ERROR]", err.message);
+        res.status(502).json({ code: 502, message: "目标站点访问失败（请检查代理）" });
+    }
+});
+
+router.get('/category/:category/:page', async (req, res) => {
+    const { category, page } = req.params;
+
+    const url = `${Host}/categories/${category}/?mode=async&function=get_block&block_id=list_videos_common_videos_list&sort_by=post_date&from=${page}&_=1777459036529`;
+    const key = `${cacheKey}_${url}`;
+
+    console.log(`[jabletv][SEARCH] ${category} page=${page}`);
+
+    try {
+        let data = await get(key);
+        const from = data ? "cache" : "server";
+
+        if (!data) {
+            console.log("[jabletv][SEARCH] 缓存未命中，开始请求（代理优先）");
+
+            const resData = await axiosClient({
+                url,
+                method: "GET",
+                useProxy: true,
+                headers: {
+                    Referer: Host,
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
+                }
+            });
+
+            data = getData(resData.data);
+            updateTime = new Date().toISOString();
+            await set(key, data);
+        }
+
+        res.json({
+            code: 200,
+            message: "获取成功",
+            ...routerInfo,
+            from,
+            total: data.data.length,
+            updateTime,
+            data
+        });
+    } catch (err) {
+        console.error("[jabletv][SEARCH_ERROR]", err.message);
+        res.status(502).json({ code: 502, message: "目标站点访问失败（请检查代理）" });
+    }
+});
+
 router.get('/uid/:uid', async (req, res) => {
     const { uid } = req.params;
     const url = Host + `/videos/${uid}/`;

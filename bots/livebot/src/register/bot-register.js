@@ -4,24 +4,25 @@
 const ytb = require('../spiderOther/youtubeAPI');
 const douyinUtil = require("../utils/douyin-utils");
 const bilibiliUtil = require("../utils/bilibili-utils");
+const kuaishouUtil = require("../utils/kuaishou-utils");
 
 // 自定义 stripIndent 函数
 function stripIndent(str) {
-  if (!str) return '';
-  const lines = str.split('\n');
-  const indentation = lines
-    .filter(line => line.trim() !== '')
-    .reduce((min, line) => {
-      const match = line.match(/^\s+/);
-      const indent = match ? match[0].length : 0;
-      return min === null ? indent : Math.min(min, indent);
-    }, null);
-  
-  if (indentation === null) return str;
-  
-  return lines
-    .map(line => line.slice(indentation))
-    .join('\n');
+    if (!str) return '';
+    const lines = str.split('\n');
+    const indentation = lines
+        .filter(line => line.trim() !== '')
+        .reduce((min, line) => {
+            const match = line.match(/^\s+/);
+            const indent = match ? match[0].length : 0;
+            return min === null ? indent : Math.min(min, indent);
+        }, null);
+
+    if (indentation === null) return str;
+
+    return lines
+        .map(line => line.slice(indentation))
+        .join('\n');
 }
 
 // =============================================================================================
@@ -29,7 +30,6 @@ function stripIndent(str) {
 // =============================================================================================
 let $ = null;
 let dbm = null;
-let rateLimit;
 let apiHandlers = {};
 let siteList = [];
 let password;
@@ -48,9 +48,9 @@ async function initialize(includes, databaseManager, api, configs) {
     config = configs;
 
     // 加载用户数据
-            users = await dbm.getUser();
+    users = await dbm.getUser();
 
-            // 加载速率限制配置
+    // 加载速率限制配置
     try {
         rateLimit = parseInt(await dbm.getSettings('rateLimit')['value']);
     } catch (e) {
@@ -68,10 +68,10 @@ async function initialize(includes, databaseManager, api, configs) {
 
 function registerEventListeners() {
     // 用户更新事件
-            $.emitter.on('updateUsers', async () => {
-                users = await dbm.getUser();
-                $.log('Reloaded Users.');
-            });
+    $.emitter.on('updateUsers', async () => {
+        users = await dbm.getUser();
+        $.log('Reloaded Users.');
+    });
 
     // 设置更新事件
     $.emitter.on('updateSettings', async () => {
@@ -87,10 +87,10 @@ function registerEventListeners() {
 async function sendStartupNotification() {
     const messageService = $.services.message;
     const permissionService = $.services.permission;
-    
+
     // 获取管理员列表
     const admins = await permissionService.getAdmins();
-    
+
     if (admins.length > 0) {
         for (const admin of admins) {
             try {
@@ -109,14 +109,14 @@ function checkPermission(handler) {
     return async (msg, match) => {
         const userId = msg.from.id;
         const chatId = msg.chat.id;
-        
+
         // 检查用户权限
         const permissionService = $.services.permission;
         const messageService = $.services.message;
-        
+
         // 检查用户是否存在
         const exists = await permissionService.userExists(userId);
-        
+
         if (!exists) {
             // 新用户，处理加入请求
             await permissionService.handleNewUser(msg, messageService);
@@ -127,21 +127,21 @@ function checkPermission(handler) {
             }
             return;
         }
-        
+
         // 检查权限
         const hasPermission = await permissionService.checkPermission(userId, 1);
         if (!hasPermission) {
             await messageService.sendTemplate(chatId, 'noPermission');
             return;
         }
-        
+
         // 检查频率限制
         const rateLimitResult = messageService.checkRateLimit(userId);
         if (!rateLimitResult.allowed) {
             await messageService.sendTemplate(chatId, 'rateLimit');
             return;
         }
-        
+
         // 执行原始处理函数
         await handler(msg, match);
     };
@@ -210,41 +210,41 @@ function registerCommands() {
         const username = $.parseTgUserNickname(msg.from);
         const chatId = msg.chat.id;
         const messageService = $.services.message;
-        
+
         try {
             // 调用后端 API 获取登录 token
             $.log(`用户 ${username} (${userId}) 请求登录链接`);
-            
+
             // 从 config 中获取环境配置
             const currentEnv = config.environment;
             const envConfig = config[currentEnv];
-            
+
             const apiHost = envConfig.apiHost || 'http://localhost';
             const backendPort = envConfig.backendPort || '3002';
             const frontendPort = envConfig.frontendPort || '3003';
-            
+
             const apiUrl = `${apiHost}:${backendPort}/api/auth/login/telegram`;
-            
+
             const response = await $.axios.post(apiUrl, {
                 userId,
                 username
             });
-            
+
             if (response.data && response.data.token) {
                 const token = response.data.token;
                 // 生成包含 token 的登录链接
                 const frontendHost = apiHost.replace('localhost', '127.0.0.1');
-                const loginUrl = frontendPort === '80' 
-                    ? `${frontendHost}/login?token=${token}` 
+                const loginUrl = frontendPort === '80'
+                    ? `${frontendHost}/login?token=${token}`
                     : `${frontendHost}:${frontendPort}/login?token=${token}`;
-                
+
                 // 使用内联键盘按钮显示登录链接
                 const keyboard = [
                     [
-                        {text: "🔑 点击登录系统", url: loginUrl}
+                        { text: "🔑 点击登录系统", url: loginUrl }
                     ]
                 ];
-                
+
                 await messageService.sendWithKeyboard(chatId, stripIndent(`
 🔑 登录链接已生成
 
@@ -390,7 +390,7 @@ async function handlePasswordCommand(msg, match) {
 
 async function handlePandaLiveCommand(msg) {
     const messageService = $.services.message;
-    
+
     let arr = $.pandaliveList;
     if (!arr.length) {
         await messageService.sendText(msg.chat.id, '暂无主播哦。');
@@ -413,7 +413,7 @@ async function handlePandaLiveCommand(msg) {
 
 async function handleRedLiveCommand(msg) {
     const messageService = $.services.message;
-    
+
     let arr = $.redliveList;
     if (!arr.length) {
         await messageService.sendText(msg.chat.id, '暂无平台哦！稍后试试。');
@@ -682,52 +682,52 @@ function registerMessageHandlers() {
         storeMessage(msg);
         await handleIncomingText(msg);
     });
-    
+
     // 监听其他类型的消息
     $.bot.on('photo', async msg => {
         storeMessage(msg);
     });
-    
+
     $.bot.on('video', async msg => {
         storeMessage(msg);
     });
-    
+
     $.bot.on('audio', async msg => {
         storeMessage(msg);
     });
-    
+
     $.bot.on('document', async msg => {
         storeMessage(msg);
     });
-    
+
     $.bot.on('sticker', async msg => {
         storeMessage(msg);
     });
-    
+
     $.bot.on('animation', async msg => {
         storeMessage(msg);
     });
-    
+
     $.bot.on('voice', async msg => {
         storeMessage(msg);
     });
-    
+
     $.bot.on('contact', async msg => {
         storeMessage(msg);
     });
-    
+
     $.bot.on('location', async msg => {
         storeMessage(msg);
     });
-    
+
     $.bot.on('venue', async msg => {
         storeMessage(msg);
     });
-    
+
     $.bot.on('poll', async msg => {
         storeMessage(msg);
     });
-    
+
     $.bot.on('dice', async msg => {
         storeMessage(msg);
     });
@@ -739,7 +739,7 @@ function storeMessage(msg) {
     if ($.recentMessages.length >= 100) {
         $.recentMessages.shift();
     }
-    
+
     // 存储消息
     $.recentMessages.push({
         message_id: msg.message_id,
@@ -769,6 +769,12 @@ async function handleIncomingText(msg) {
     // 处理抖音链接
     if (douyinUtil.extractDouyinUrl(msgText) !== 0) {
         await handleDouyinUrl(msg, msgText);
+        return;
+    }
+
+    // 处理快手链接
+    if (kuaishouUtil.extractKuaishouUrl(msgText) !== 0) {
+        await handleKuaishouUrl(msg, msgText);
         return;
     }
 
@@ -842,8 +848,8 @@ async function handleIncomingText(msg) {
     const isUrl = msgText.startsWith('http://') || msgText.startsWith('https://');
     if (isUrl && !isYoutubeUrl(msgText)) {
         const site = msgText.split("/")[2];
-        $.bot.sendMessage(msg.chat.id, 
-            `❌ 抱歉，当前不支持该网站：\`${site}\`\n\n请使用支持的直播平台链接！`, 
+        $.bot.sendMessage(msg.chat.id,
+            `❌ 抱歉，当前不支持该网站：\`${site}\`\n\n请使用支持的直播平台链接！`,
             $.defTgMsgForm
         );
         return;
@@ -877,8 +883,8 @@ async function handleDouyinUrl(msg, msgText) {
         const inlineKeyboard = {
             inline_keyboard: [
                 [
-                    {text: "添加直播间", callback_data: `addLive_https://live.douyin.com/${roomID}_${msg.chat.id}`},
-                    {text: "添加福袋", callback_data: `addLucky_${roomID}_${msg.chat.id}`},
+                    { text: "添加直播间", callback_data: `addLive_https://live.douyin.com/${roomID}_${msg.chat.id}` },
+                    { text: "添加福袋", callback_data: `addLucky_${roomID}_${msg.chat.id}` },
                 ]
             ]
         };
@@ -893,8 +899,8 @@ async function handleDouyinUrl(msg, msgText) {
             reply_markup: {
                 inline_keyboard: [
                     [
-                        {text: "获取视频", callback_data: `getVideo_${shareUrl.replace('_','999')}_${msg.chat.id}`},
-                        {text: "获取动图", url: "https://dy.yizhifa.cyou"},
+                        { text: "获取视频", callback_data: `getVideo_${shareUrl.replace('_', '999')}_${msg.chat.id}` },
+                        { text: "获取动图", url: "https://dy.yizhifa.cyou" },
                     ]
                 ]
             }
@@ -902,6 +908,190 @@ async function handleDouyinUrl(msg, msgText) {
     }
 }
 
+async function handleKuaishouUrl(msg, msgText) {
+    const shareUrl = kuaishouUtil.extractKuaishouUrl(msgText);
+    if (!shareUrl) {
+        return $.bot.sendMessage(msg.chat.id, '未找到有效的快手链接', $.defTgMsgForm);
+    }
+
+    const record = {
+        share_url: shareUrl,
+        parse_url: null,
+        parse_status: 0,
+        parse_message: '',
+        content_type: null,
+        video_url: null,
+        image_count: 0,
+        image_urls: null,
+        title: null,
+        chat_id: msg.chat.id,
+        send_status: 0,
+        send_message: '',
+        message_ids: null,
+        group_send_results: null
+    };
+
+    try {
+        $.bot.sendMessage(msg.chat.id, '⏳ 快手解析中...', $.defTgMsgForm);
+
+        const result = await kuaishouUtil.parseKuaishouUrl(shareUrl);
+        record.parse_url = shareUrl;
+
+        if (!result || result.code !== 200) {
+            record.parse_status = 2;
+            record.parse_message = `解析失败: ${result?.msg || '未知错误'}`;
+            record.send_status = 2;
+            record.send_message = record.parse_message;
+            await $.bot.sendMessage(msg.chat.id, `❌ 解析失败: ${result?.msg || '未知错误'}`, $.defTgMsgForm);
+            return;
+        }
+
+        const { data } = result;
+        record.parse_status = 1;
+        record.parse_message = '解析成功';
+        record.title = data.title || '快手内容';
+
+        const messageIds = [];
+
+        if (data.url) {
+            record.content_type = 'video';
+            record.video_url = data.url;
+            const durationStr = data.durationFormat ? `⏱ ${data.durationFormat}` : '';
+            const msgContent = `🎬 快手解析完成\n\n📺 作者: ${data.author || '未知'}\n📝 标题: ${data.title || '无'}\n\n👁️ 阅读: ${data.views?.toLocaleString() || 0} | 👍 点赞: ${data.likes?.toLocaleString() || 0} | 💬 评论: ${data.comments?.toLocaleString() || 0}\n\n${durationStr}`;
+
+            const inlineKeyboard = {
+                inline_keyboard: [
+                    [
+                        { text: "📹 查看视频", url: data.url }
+                    ]
+                ]
+            };
+
+            if (data.url) {
+                try {
+                    const sentMessage = await $.bot.sendVideo(msg.chat.id, data.url, {
+                        ...$.defTgMsgForm,
+                        caption: msgContent,
+                        reply_markup: inlineKeyboard
+                    });
+                    messageIds.push(sentMessage.message_id);
+                    record.send_status = 1;
+                    record.send_message = '视频发送成功';
+                } catch (videoError) {
+                    console.error('[kuaishou] Send video failed, try photo:', videoError.message);
+                    if (data.cover) {
+                        const sentPhoto = await $.bot.sendPhoto(msg.chat.id, data.cover, {
+                            ...$.defTgMsgForm,
+                            caption: msgContent,
+                            reply_markup: inlineKeyboard
+                        });
+                        messageIds.push(sentPhoto.message_id);
+                        record.send_status = 1;
+                        record.send_message = '视频无法发送，已发送封面';
+                    } else {
+                        const sentMsg = await $.bot.sendMessage(msg.chat.id, msgContent, { ...$.defTgMsgForm, reply_markup: inlineKeyboard });
+                        messageIds.push(sentMsg.message_id);
+                        record.send_status = 1;
+                        record.send_message = '视频无法发送，已发送文字';
+                    }
+                }
+            } else if (data.cover) {
+                const sentPhoto = await $.bot.sendPhoto(msg.chat.id, data.cover, {
+                    ...$.defTgMsgForm,
+                    caption: msgContent,
+                    reply_markup: inlineKeyboard
+                });
+                messageIds.push(sentPhoto.message_id);
+                record.send_status = 1;
+                record.send_message = '视频地址为空，已发送封面';
+            } else {
+                const sentMsg = await $.bot.sendMessage(msg.chat.id, msgContent, { ...$.defTgMsgForm, reply_markup: inlineKeyboard });
+                messageIds.push(sentMsg.message_id);
+                record.send_status = 1;
+                record.send_message = '视频和封面都为空，已发送文字';
+            }
+        } else if (result.image && result.image.length > 0) {
+            record.content_type = 'image';
+            record.image_count = result.image.length;
+            record.image_urls = JSON.stringify(result.image);
+            
+            const imageCount = data.count || result.image.length || 0;
+            const allImages = result.image;
+            const batchSize = 10;
+            const totalBatches = Math.ceil(allImages.length / batchSize);
+            let hasError = false;
+
+            for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+                const startNum = batchIndex * batchSize + 1;
+                const endNum = Math.min((batchIndex + 1) * batchSize, allImages.length);
+                const imageUrls = allImages.slice(batchIndex * batchSize, (batchIndex + 1) * batchSize);
+
+                const batchInfo = `📊 第 ${batchIndex + 1}/${totalBatches} 组 (${startNum}-${endNum}/${imageCount})`;
+                const msgContent = `🖼️ 快手图集解析完成\n\n📺 作者: ${data.author || '未知'}\n📝 标题: ${data.title || '无'}\n\n${batchInfo}\n\n👁️ 阅读: ${data.views?.toLocaleString() || 0} | 👍 点赞: ${data.likes?.toLocaleString() || 0}`;
+
+                try {
+                    const mediaGroup = imageUrls.map((imgUrl, index) => ({
+                        type: 'photo',
+                        media: imgUrl,
+                        caption: index === 0 ? msgContent : undefined
+                    }));
+
+                    const sentMessages = await $.bot.sendMediaGroup(msg.chat.id, mediaGroup, $.defTgMsgForm);
+                    messageIds.push(...sentMessages.map(m => m.message_id));
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                } catch (mediaError) {
+                    console.error('[kuaishou] SendMediaGroup error, try single:', mediaError.message);
+                    hasError = true;
+                    if (batchIndex === 0) {
+                        const sentMsg = await $.bot.sendMessage(msg.chat.id, msgContent, $.defTgMsgForm);
+                        messageIds.push(sentMsg.message_id);
+                    }
+                    for (const imgUrl of imageUrls) {
+                        try {
+                            const sentPhoto = await $.bot.sendPhoto(msg.chat.id, imgUrl, $.defTgMsgForm);
+                            messageIds.push(sentPhoto.message_id);
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                        } catch (imgError) {
+                            console.error('[kuaishou] Send image error:', imgError.message);
+                        }
+                    }
+                }
+            }
+
+            record.send_status = hasError ? 2 : 1;
+            record.send_message = hasError ? '部分图片发送失败' : `已完成发送，共 ${imageCount} 张图片`;
+
+            if (result.music?.musicBgm) {
+                const musicKeyboard = {
+                    inline_keyboard: [
+                        [
+                            { text: "🎵 查看背景音乐", url: result.music.musicBgm }
+                        ]
+                    ]
+                };
+                const sentMsg = await $.bot.sendMessage(msg.chat.id, `🎵 背景音乐: ${result.music.musicName || '未知'}`, { ...$.defTgMsgForm, reply_markup: musicKeyboard });
+                messageIds.push(sentMsg.message_id);
+            }
+        } else {
+            record.parse_status = 2;
+            record.parse_message = '未找到视频或图集数据';
+            record.send_status = 2;
+            record.send_message = record.parse_message;
+            await $.bot.sendMessage(msg.chat.id, '❌ 未找到视频或图集数据', $.defTgMsgForm);
+        }
+
+        record.message_ids = JSON.stringify(messageIds);
+    } catch (error) {
+        console.error('[kuaishou] Handle error:', error.message);
+        record.parse_status = 2;
+        record.parse_message = error.message;
+        record.send_status = 2;
+        record.send_message = error.message;
+        await $.bot.sendMessage(msg.chat.id, `❌ 解析出错: ${error.message}`, $.defTgMsgForm);
+    } finally {
+        await saveParseRecord(record);
+    }
+}
 
 async function handleBilibiliUrl(msg, msgText) {
     const shareUrl = bilibiliUtil.extractBiliBiliUrl(msgText);
@@ -963,7 +1153,7 @@ async function handleBilibiliUrl(msg, msgText) {
                 record.message_ids = JSON.stringify([sentMessage.message_id]);
                 record.send_status = 1;
                 record.send_message = '视频发送成功';
-                
+
                 // 发送到B站解析群组
                 const groupResults = await sendToGroups('video', videoUrl, null, caption, resultShare.title, 'biliJxGroups');
                 if (groupResults.length > 0) {
@@ -974,7 +1164,7 @@ async function handleBilibiliUrl(msg, msgText) {
                 $.log(`发送视频失败: ${videoError.message}`, 'error');
                 record.send_status = 2;
                 record.send_message = `发送失败: ${videoError.message}`;
-                
+
                 // 降级方案：分开发送封面和说明
                 const messageIds = [];
                 if (resultShare.imgurl) {
@@ -1171,7 +1361,7 @@ async function handleSupportedWebsiteLink(msg, msgText) {
     try {
         const data = await api.getStationStatus(mid);
         if (data.code) {
-            const {title, roomid, username, room_status, liveUrl, avatar_thumb, targetUrl} = data;
+            const { title, roomid, username, room_status, liveUrl, avatar_thumb, targetUrl } = data;
             $.bot.sendMessage(msg.chat.id,
                 `🎉查看主播 \`${username}\`\n👉️[源站](${targetUrl})\n👉▶️[直接播放](${liveUrl})`,
                 $.defTgMsgForm
@@ -1191,10 +1381,10 @@ async function handleSupportedWebsiteLink(msg, msgText) {
 async function forwardToAdmins(msg) {
     const permissionService = $.services.permission;
     const messageService = $.services.message;
-    
+
     // 获取管理员列表
     const adminlist = await permissionService.getAdmins();
-    
+
     adminlist.forEach(user => {
         const userId = user.userId;
         // 移除管理员消息会给自己发
@@ -1219,14 +1409,14 @@ async function handleCallbackQuery(query) {
     // 添加直播间
     if (query.data.startsWith('addLive_')) {
         const [prefix, shareUrl, chatId] = query.data.split('_');
-        const msg = {chat: {id: chatId}};
+        const msg = { chat: { id: chatId } };
         _addWatchByMid(msg, shareUrl);
     }
 
     // 添加福袋
     if (query.data.startsWith('addLucky_')) {
         const [prefix, roomID, chatId] = query.data.split('_');
-        const msg = {chat: {id: chatId}};
+        const msg = { chat: { id: chatId } };
         let url = `https://fd.live.douyin.com/fudai_${roomID}`;
         _addWatchByMid(msg, url);
     }
@@ -1280,27 +1470,27 @@ async function saveParseRecord(record) {
 
 async function sendToGroups(contentType, videoUrl, imageUrls, caption, title, groupsConfigKey = 'dyJxGroups') {
     const results = [];
-    
+
     try {
         const groupsConfig = config[groupsConfigKey];
         if (!groupsConfig || !groupsConfig.includes('_')) {
             return results;
         }
-        
+
         const parts = groupsConfig.split('_');
         if (parts.length < 2 || parts[0] !== '1') {
             return results;
         }
-        
+
         const groupsStr = parts[1].replace('[', '').replace(']', '');
         const groupIds = groupsStr.split(',').map(id => id.trim()).filter(id => id && !isNaN(Number(id)));
-        
+
         if (groupIds.length === 0) {
             return results;
         }
-        
+
         $.log(`开始发送到 ${groupIds.length} 个群组...`);
-        
+
         for (const groupId of groupIds) {
             const groupResult = {
                 group_id: Number(groupId),
@@ -1309,17 +1499,17 @@ async function sendToGroups(contentType, videoUrl, imageUrls, caption, title, gr
                 success: true,
                 error_message: ''
             };
-            
+
             try {
                 if (contentType === 'image' && imageUrls && imageUrls.length > 0) {
                     const batchSize = 10;
                     const totalBatches = Math.ceil(imageUrls.length / batchSize);
-                    
+
                     for (let batch = 0; batch < totalBatches; batch++) {
                         const startIndex = batch * batchSize;
                         const endIndex = Math.min(startIndex + batchSize, imageUrls.length);
                         const currentBatchImages = imageUrls.slice(startIndex, endIndex);
-                        
+
                         const mediaGroup = currentBatchImages.map((imageUrl, index) => {
                             const isFirstItem = batch === 0 && index === 0;
                             return {
@@ -1328,15 +1518,15 @@ async function sendToGroups(contentType, videoUrl, imageUrls, caption, title, gr
                                 caption: isFirstItem ? (title || '来自抖音的图片组') : ''
                             };
                         });
-                        
+
                         const sentMessages = await $.bot.sendMediaGroup(Number(groupId), mediaGroup);
                         groupResult.message_ids.push(...sentMessages.map(m => m.message_id));
-                        
+
                         if (batch < totalBatches - 1) {
                             await new Promise(resolve => setTimeout(resolve, 500));
                         }
                     }
-                    
+
                     const textMessage = await $.bot.sendMessage(Number(groupId), `已完成发送，共 ${imageUrls.length} 张图片`);
                     groupResult.message_ids.push(textMessage.message_id);
                 } else if (contentType === 'video' && videoUrl) {
@@ -1358,7 +1548,7 @@ async function sendToGroups(contentType, videoUrl, imageUrls, caption, title, gr
                         groupResult.error_message = sendError.message;
                     }
                 }
-                
+
                 try {
                     const chat = await $.bot.getChat(Number(groupId));
                     if (chat.username) {
@@ -1370,22 +1560,22 @@ async function sendToGroups(contentType, videoUrl, imageUrls, caption, title, gr
                 } catch (chatError) {
                     $.log(`获取群组 ${groupId} 信息失败：${chatError.message}`, 'warn');
                 }
-                
+
                 $.log(`成功发送到群组 ${groupId}`);
             } catch (error) {
                 $.log(`发送到群组 ${groupId} 失败：${error.message}`, 'error');
                 groupResult.success = false;
                 groupResult.error_message = error.message;
             }
-            
+
             results.push(groupResult);
-            
+
             await new Promise(resolve => setTimeout(resolve, 1000));
         }
     } catch (error) {
         $.log(`发送到群组失败：${error.message}`, 'error');
     }
-    
+
     return results;
 }
 
@@ -1420,9 +1610,9 @@ async function handleGetVideoCallback(query) {
     };
 
     try {
-        const dyurl = `${config.dyJxApi}?msg=${shareUrl.replace('999','_')}`;
+        const dyurl = `${config.dyJxApi}?msg=${shareUrl.replace('999', '_')}`;
         record.parse_url = dyurl;
-        
+
         const response = await $.axios.get(dyurl);
         if (response.status !== 200) {
             throw new Error('API请求失败');
@@ -1474,7 +1664,7 @@ async function handleGetVideoCallback(query) {
 
             const textMessage = await $.bot.sendMessage(msg.chat.id, `已完成发送，共 ${totalImages} 张图片`);
             messageIds.push(textMessage.message_id);
-            
+
             record.message_ids = JSON.stringify(messageIds);
             record.send_status = 1;
             record.send_message = `已完成发送，共 ${totalImages} 张图片`;
@@ -1504,7 +1694,7 @@ async function handleGetVideoCallback(query) {
                 record.send_status = 1;
                 record.send_message = '视频发送成功';
                 $.log('视频发送成功');
-                
+
                 const groupResults = await sendToGroups('video', videoUrl, null, caption, respData.title);
                 if (groupResults.length > 0) {
                     record.group_send_results = JSON.stringify(groupResults);
@@ -1524,7 +1714,7 @@ async function handleGetVideoCallback(query) {
         record.parse_message = error.message;
         record.send_status = 2;
         record.send_message = error.message;
-        
+
         if (chatId && !isNaN(Number(chatId))) {
             await $.bot.sendMessage(msg.chat.id, '获取发现未知状况');
         } else {
@@ -1599,7 +1789,7 @@ async function handleStationStatus(msg, mid, site, api, targetUrl) {
     try {
         const data = await api.getStationStatus(mid);
         if (data.code) {
-            const {title, roomid, username, room_status, liveUrl, avatar_thumb} = data;
+            const { title, roomid, username, room_status, liveUrl, avatar_thumb } = data;
             if (await dbm.addVtbToWatch(msg.chat.id, mid, roomid, username, room_status, title, site, avatar_thumb, liveUrl, targetUrl)) {
                 const addWatch = await dbm.addWatch(msg.chat.id, mid);
                 if (addWatch) {
@@ -1623,7 +1813,7 @@ async function handleStationStatus(msg, mid, site, api, targetUrl) {
 async function sendAddSuccessMessage(chatId, username, mid, targetUrl) {
     const permissionLevel = await dbm.getUserPermissionLevel(chatId);
     if (permissionLevel === 2) {
-        const keyboard = createKeyboard(mid, targetUrl.replace('fd.','').replace('fudai_',''));
+        const keyboard = createKeyboard(mid, targetUrl.replace('fd.', '').replace('fudai_', ''));
         await sendMessageWithKeyboard(chatId, `🎉已添加主播 ${username}`, keyboard);
     } else {
         $.bot.sendMessage(chatId, `🎉已添加主播${username}`, $.defTgMsgForm);
@@ -1640,15 +1830,15 @@ async function sendMessageWithKeyboard(chatId, text, keyboard) {
 function createKeyboard(mid, targetUrl) {
     return {
         inline_keyboard: [
-            [{text: '取消关注', callback_data: `unfollow_${mid}`},
-                {text: '跳转链接', url: targetUrl}],
-            [{text: '学习', callback_data: `douyin_${mid}_study`},
-                {text: '游戏', callback_data: `douyin_${mid}_game`}],
-            [{text: '舞蹈', callback_data: `douyin_${mid}_dance`},
-                {text: '颜值', callback_data: `douyin_${mid}_looks`}],
-            [{text: '超级福袋', callback_data: `douyin_${mid}_lucky`},
-                {text: '普通福袋', callback_data: `douyin_${mid}_luckys`}],
-            [{text: '19+', callback_data: `douyin_${mid}_av`}]
+            [{ text: '取消关注', callback_data: `unfollow_${mid}` },
+            { text: '跳转链接', url: targetUrl }],
+            [{ text: '学习', callback_data: `douyin_${mid}_study` },
+            { text: '游戏', callback_data: `douyin_${mid}_game` }],
+            [{ text: '舞蹈', callback_data: `douyin_${mid}_dance` },
+            { text: '颜值', callback_data: `douyin_${mid}_looks` }],
+            [{ text: '超级福袋', callback_data: `douyin_${mid}_lucky` },
+            { text: '普通福袋', callback_data: `douyin_${mid}_luckys` }],
+            [{ text: '19+', callback_data: `douyin_${mid}_av` }]
         ]
     };
 }
@@ -1707,9 +1897,9 @@ async function WatchByMidChats(msg, vtb) {
             let keyboard = {
                 inline_keyboard: [
                     [
-                        {text: '取消关注', callback_data: unfollowCallbackData},
-                        {text: '删除消息', callback_data: 'delete_message'},
-                        {text: '跳转链接', url: targetUrl}
+                        { text: '取消关注', callback_data: unfollowCallbackData },
+                        { text: '删除消息', callback_data: 'delete_message' },
+                        { text: '跳转链接', url: targetUrl }
                     ]
                 ]
             };
@@ -1727,8 +1917,8 @@ async function WatchByMidChats(msg, vtb) {
                     ...$.defTgMsgForm,  // 保留原有消息格式配置
                     reply_markup: JSON.stringify({
                         inline_keyboard: [
-                            [{text: '取消关注', callback_data: `unfollow_${vtb.mid}`},
-                                {text: '跳转链接', url: targetUrl}]
+                            [{ text: '取消关注', callback_data: `unfollow_${vtb.mid}` },
+                            { text: '跳转链接', url: targetUrl }]
                         ]
                     })
                 });
@@ -1768,7 +1958,7 @@ async function WatchByRedLiveList(msg, pingtai) {
 
     try {
         const resp = await $.axios.get(`http://api.vipmisss.com:81/xcdsw/${pingtai.address}`)
-        const {zhubo} = resp.data;
+        const { zhubo } = resp.data;
 
         let arr = zhubo;
         if (!arr.length) {
@@ -1824,7 +2014,7 @@ async function WatchByRedLive(msg, vtb) {
             // 如果发送图片消息失败，记录错误信息并发送纯文本消息
             $.log("发送图片消息报错 => " + err.message, 'error');
             try {
-                await $.bot.sendMessage(watch, head, {parse_mode: 'HTML'});
+                await $.bot.sendMessage(watch, head, { parse_mode: 'HTML' });
             } catch (msgErr) {
                 $.log("发送纯文本消息报错 => " + msgErr.message, 'error');
             }
@@ -1832,7 +2022,7 @@ async function WatchByRedLive(msg, vtb) {
     } else {
         // 如果没有图片链接，直接发送文本消息
         try {
-            await $.bot.sendMessage(watch, head, {parse_mode: 'HTML'});
+            await $.bot.sendMessage(watch, head, { parse_mode: 'HTML' });
         } catch (msgErr) {
             $.log("发送纯文本消息报错 => " + msgErr.message, 'error');
         }

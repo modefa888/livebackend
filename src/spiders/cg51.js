@@ -65,6 +65,70 @@ function getData(html, imgHost) {
     }
 }
 
+
+function parseCategories(html, host) {
+    const $ = cheerio.load(html);
+    const result = [];
+
+    $(".navbar-nav > .nav-item").each((_, item) => {
+        const $item = $(item);
+
+        // 一级分类名称
+        let parentName =
+            $item.find("> a div").first().text().trim() ||
+            $item.find("> button div").first().text().trim();
+
+        if (!parentName || parentName === "首页") return;
+
+        const children = [];
+
+        // 处理二级分类
+        $item.find("> .dropdown-menu > .dropdown-item a").each((__, child) => {
+            const $child = $(child);
+
+            const name = $child.text().trim();
+            const hrefRaw = $child.attr("href") || "";
+            const href = hrefRaw.startsWith("http")
+                ? hrefRaw
+                : `${host}${hrefRaw}`;
+
+            const slugMatch = hrefRaw.match(/\/category\/([^\/]+)\//);
+            const slug = slugMatch ? slugMatch[1] : "";
+
+            children.push({
+                name,
+                categoryId: slug,
+                href
+            });
+        });
+
+        // 如果没有子菜单，解析自身链接
+        if (!children.length) {
+            const hrefRaw = $item.find("> a").attr("href") || "";
+            const href = hrefRaw.startsWith("http")
+                ? hrefRaw
+                : `${host}${hrefRaw}`;
+
+            const slugMatch = hrefRaw.match(/\/category\/([^\/]+)\//);
+            const slug = slugMatch ? slugMatch[1] : "";
+
+            result.push({
+                name: parentName,
+                categoryId: slug,
+                href
+            });
+        } else {
+            result.push({
+                name: parentName,
+                children
+            });
+        }
+    });
+
+    // 去掉最后4个一级菜单
+    return result.slice(0, -3);
+}
+
 router.get('/', async (req, res) => {
     const imgHost = `http://${req.headers.host}/spider-api/cg51/img?url=`;
 
@@ -77,6 +141,37 @@ router.get('/', async (req, res) => {
             data = getData(html, imgHost);
             updateTime = new Date().toISOString();
             await set(cacheKey, data);
+        }
+
+        res.json({
+            code: 200,
+            message: "获取成功",
+            ...routerInfo,
+            from,
+            total: data.length,
+            updateTime,
+            data
+        });
+    } catch (error) {
+        console.warn("[51cg][REQUEST_ERROR]", error.message);
+        res.status(403).json({ code: 403, message: "目标站点访问受限（请检查代理）" });
+    }
+});
+
+router.get('/categories', async (req, res) => {
+    const imgHost = `http://${req.headers.host}/spider-api/cg51/img?url=`;
+    const url = `${cgHost}`;
+    const key = `${cacheKey}_/`;
+
+    try {
+        let data = await get(key);
+        const from = data ? "cache" : "server";
+
+        if (!data) {
+            const html = await fetchHtml(url);
+            data = parseCategories(html, cgHost);
+            updateTime = new Date().toISOString();
+            await set(key, data);
         }
 
         res.json({
