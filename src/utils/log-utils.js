@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const bunyan = require('bunyan');
+const RotatingFileStream = require('bunyan-rotating-file-stream');
 
 const logDir = path.resolve(__dirname, '../../log');
 
@@ -12,16 +13,48 @@ try {
     console.log('创建日志文件夹失败，仅使用控制台日志');
 }
 
+const rotatingFileStreams = {};
+
+function getRotatingFileStream(name, type) {
+    const key = `${name}-${type}`;
+    if (!rotatingFileStreams[key]) {
+        rotatingFileStreams[key] = new RotatingFileStream({
+            path: path.join(logDir, `${name}-${type}-%Y-%m-%d.log`),
+            period: '1d',
+            totalFiles: 30,
+            rotateExisting: true,
+            threshold: '10m',
+            totalSize: '20m',
+            gzip: true
+        });
+    }
+    return rotatingFileStreams[key];
+}
+
 function Logger(name) {
-    // 先尝试仅使用控制台日志，避免文件权限问题
+    const streams = [
+        {
+            level: 'info',
+            stream: process.stdout
+        }
+    ];
+    
+    try {
+        streams.push({
+            level: 'info',
+            stream: getRotatingFileStream(name, 'info')
+        });
+        streams.push({
+            level: 'error',
+            stream: getRotatingFileStream(name, 'error')
+        });
+    } catch (e) {
+        console.log('配置文件日志失败，仅使用控制台日志:', e.message);
+    }
+    
     return bunyan.createLogger({
         name: name,
-        streams: [
-            {
-                level: 'info',
-                stream: process.stdout
-            }
-        ]
+        streams
     });
 }
 

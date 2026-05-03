@@ -8,7 +8,6 @@ let task;
 let scheduleTime = '*/60 * * * *';
 
 let $ = null;
-let dbm = null;
 
 // 启动或更新定时任务
 function startOrUpdateTask(schedule) {
@@ -17,7 +16,7 @@ function startOrUpdateTask(schedule) {
         task.stop();
     }
 
-    if (schedule !== 'none') {
+    if (schedule !== 'none' && schedule !== '0') {
         // 创建新的定时任务
         task = cron.schedule(schedule, () => {
             $.log('Restarting PM2 application 0');
@@ -48,9 +47,8 @@ function getScheduleTime(){
     return scheduleTime;
 }
 
-function setConfig(config, dbsql){
+function setConfig(config){
     $ = config;
-    dbm = dbsql;
 }
 
 module.exports = {

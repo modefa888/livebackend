@@ -167,20 +167,25 @@ router.get('/messages', authenticateToken, async (req, res) => {
 // 获取日志文件列表
 router.get('/files', authenticateToken, async (req, res) => {
   try {
-    const { type = 'backend' } = req.query;
+    const { type = 'backend', bot = 'livebot' } = req.query;
+    
+    console.log('日志文件列表请求:', { type, bot, cwd: process.cwd() });
     
     let logDir;
     if (type === 'bot') {
-      logDir = path.join(process.cwd(), 'bots', 'livebot', 'log');
+      logDir = path.join(process.cwd(), 'bots', bot, 'log');
     } else {
       logDir = path.join(process.cwd(), 'log');
     }
+    
+    console.log('日志目录:', logDir);
     
     if (!fs.existsSync(logDir)) {
       fs.mkdirSync(logDir, { recursive: true });
     }
     
     const files = fs.readdirSync(logDir).filter(file => file.endsWith('.log'));
+    console.log('找到的日志文件:', files);
     res.status(200).json(files);
   } catch (error) {
     console.error('获取日志文件列表错误:', error);
@@ -191,12 +196,12 @@ router.get('/files', authenticateToken, async (req, res) => {
 // 获取日志文件内容
 router.get('/files/:filename', authenticateToken, async (req, res) => {
   const { filename } = req.params;
-  const { type = 'backend' } = req.query;
+  const { type = 'backend', bot = 'livebot' } = req.query;
   
   try {
     let logPath;
     if (type === 'bot') {
-      logPath = path.join(process.cwd(), 'bots', 'livebot', 'log', filename);
+      logPath = path.join(process.cwd(), 'bots', bot, 'log', filename);
     } else {
       logPath = path.join(process.cwd(), 'log', filename);
     }

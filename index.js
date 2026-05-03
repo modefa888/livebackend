@@ -69,6 +69,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // 静态资源服务
 app.use('/images', express.static('public/images'));
+app.use('/api/scripts', express.static('src/public/scripts'));
 
 // 统计请求次数的中间件
 app.use((req, res, next) => {

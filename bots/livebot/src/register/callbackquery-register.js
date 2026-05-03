@@ -11,7 +11,7 @@ const github = require('../utils/github-utils');
 
 module.exports = async ($, dbm, config) => {
     // 优先设置定时任务
-    setConfig($, dbm);
+    setConfig($);
     setNotifyConfig($, dbm, config);
     let getDBTime;
     try {

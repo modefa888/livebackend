@@ -13,7 +13,7 @@ module.exports = function($, dbm) {
                 }
                 await handler(msg, match);
             } catch (error) {
-                console.error('权限检查时出错:', error);
+                $.log('权限检查时出错:' + error, 'error');
                 await $.bot.sendMessage(msg.chat.id, '⚠️ 处理请求时发生错误');
             }
         };
@@ -142,7 +142,7 @@ module.exports = function($, dbm) {
                 // 确认回调
                 await $.bot.answerCallbackQuery(callbackQuery.id);
             } catch (error) {
-                console.error('处理回调时出错:', error);
+                $.log('处理回调时出错:' + error, 'error');
                 await $.bot.sendMessage(chatId, '⚠️ 处理请求时发生错误');
             }
         });

@@ -84,7 +84,7 @@ module.exports = ($, dbm, config) => {
                 return $.bot.sendMessage(chatId, `❌ ${result.message}` + (result.error ? `: ${result.error}` : ''));
             }
         } catch (error) {
-            console.error('处理请求错误:', error);
+            $.log('处理请求错误:' + error, 'error');
             await $.bot.sendMessage(chatId, `❌ 处理请求时出错：${error.message}`);
         }
     }

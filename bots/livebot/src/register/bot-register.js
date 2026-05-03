@@ -1588,7 +1588,7 @@ async function handleGetVideoCallback(query) {
 
     const [prefix, shareUrl, chatId] = parts;
     if (!chatId || isNaN(Number(chatId))) {
-        console.error('无效的 chatId:', chatId);
+        $.log('无效的 chatId:' + chatId, 'error');
         return;
     }
 
@@ -1626,7 +1626,9 @@ async function handleGetVideoCallback(query) {
         }
 
         record.parse_status = 1;
-        record.title = respData.title;
+        const author = respData.name ? `#${respData.name}` : '';
+        const title = respData.title || '';
+        record.title = author ? `${author} ${title}` : title;
 
         const hasImages = Array.isArray(respData.images) && respData.images.length > 0;
 
@@ -1647,10 +1649,16 @@ async function handleGetVideoCallback(query) {
 
                 const mediaGroup = currentBatchImages.map((imageUrl, index) => {
                     const isFirstItem = batch === 0 && index === 0;
+                    let caption = '';
+                    if (isFirstItem) {
+                        const author = respData.name ? `#${respData.name}` : '';
+                        const title = respData.title || '来自抖音的图片组';
+                        caption = author ? `${author} ${title}` : title;
+                    }
                     return {
                         type: 'photo',
                         media: imageUrl,
-                        caption: isFirstItem ? (respData.title || '来自抖音的图片组') : ''
+                        caption: caption
                     };
                 });
 
@@ -1684,7 +1692,9 @@ async function handleGetVideoCallback(query) {
             record.content_type = 'video';
             record.video_url = videoUrl;
 
-            const caption = respData.title || '来自抖音的视频';
+            const author = respData.name ? `#${respData.name}` : '';
+            const title = respData.title || '来自抖音的视频';
+            const caption = author ? `${author} ${title}` : title;
             try {
                 const sentMessage = await $.bot.sendVideo(msg.chat.id, videoUrl, {
                     caption: caption,

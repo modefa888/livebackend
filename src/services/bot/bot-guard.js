@@ -1,4 +1,4 @@
-const { info, error } = require('../../utils/log-utils');
+const { info, error, warn } = require('../../utils/log-utils');
 const { startBot, stopBot, getBotStatus } = require('../../../bots/livebot/bot');
 const { startFabuBot, stopFabuBot, getFabuBotStatus } = require('../../../bots/fabuBot/bot');
 const db = require('../../config/db');
@@ -277,60 +277,81 @@ class BotGuard {
     info('🔄 尝试重启所有机器人...');
 
     try {
-      await this.safeStopBot();
-      await this.safeStopFabuBot();
+      // 异步停止两个机器人
+      await Promise.all([
+        this.safeStopBot(),
+        this.safeStopFabuBot()
+      ]);
 
       await this.sleep(2000);
 
       const livebotConfig = this.botConfigs['livebot'];
       const fabubotConfig = this.botConfigs['fabubot'];
 
-      let livebotSuccess = false;
-      let fabuBotSuccess = false;
+      // 创建启动任务数组
+      const startTasks = [];
 
       if (livebotConfig) {
         if (this.livebotRestartCount >= livebotConfig.max_restart_attempts) {
-          warning(`⚠️ LiveBot 已达到最大重启次数 (${livebotConfig.max_restart_attempts}次)，跳过重启`);
+          warn(`⚠️ LiveBot 已达到最大重启次数 (${livebotConfig.max_restart_attempts}次)，跳过重启`);
         } else {
-          livebotSuccess = await this.safeStartBot();
-          if (!livebotSuccess) {
-            this.livebotRestartCount++;
-            await this.incrementRestartCount('livebot');
-            error(`❌ LiveBot 重启失败 (已尝试 ${this.livebotRestartCount}/${livebotConfig.max_restart_attempts} 次)`);
-          } else {
-            this.livebotRestartCount = 0;
-            await this.resetRestartCount('livebot');
-          }
+          startTasks.push(this.startLiveBotWithRetry(livebotConfig));
         }
       }
 
       if (fabubotConfig) {
         if (this.fabuBotRestartCount >= fabubotConfig.max_restart_attempts) {
-          warning(`⚠️ FaBuBot 已达到最大重启次数 (${fabubotConfig.max_restart_attempts}次)，跳过重启`);
+          warn(`⚠️ FaBuBot 已达到最大重启次数 (${fabubotConfig.max_restart_attempts}次)，跳过重启`);
         } else {
-          fabuBotSuccess = await this.safeStartFabuBot();
-          if (!fabuBotSuccess) {
-            this.fabuBotRestartCount++;
-            await this.incrementRestartCount('fabubot');
-            error(`❌ FaBuBot 重启失败 (已尝试 ${this.fabuBotRestartCount}/${fabubotConfig.max_restart_attempts} 次)`);
-          } else {
-            this.fabuBotRestartCount = 0;
-            await this.resetRestartCount('fabubot');
-          }
+          startTasks.push(this.startFabuBotWithRetry(fabubotConfig));
         }
       }
+
+      // 异步启动两个机器人
+      const results = await Promise.all(startTasks);
+
+      const livebotSuccess = results.some(r => r.bot === 'livebot' && r.success);
+      const fabuBotSuccess = results.some(r => r.bot === 'fabubot' && r.success);
 
       if (livebotSuccess || fabuBotSuccess) {
         info('✅ 机器人重启成功');
         this.restartBackoff = 0;
-        await this.updateRestartBackoff('livebot', 0);
-        await this.updateRestartBackoff('fabubot', 0);
+        await Promise.all([
+          this.updateRestartBackoff('livebot', 0),
+          this.updateRestartBackoff('fabubot', 0)
+        ]);
       } else {
         error('❌ 所有机器人重启失败');
       }
     } catch (err) {
       error('❌ 重启过程出错:', err);
     }
+  }
+
+  async startLiveBotWithRetry(config) {
+    const success = await this.safeStartBot();
+    if (!success) {
+      this.livebotRestartCount++;
+      await this.incrementRestartCount('livebot');
+      error(`❌ LiveBot 重启失败 (已尝试 ${this.livebotRestartCount}/${config.max_restart_attempts} 次)`);
+    } else {
+      this.livebotRestartCount = 0;
+      await this.resetRestartCount('livebot');
+    }
+    return { bot: 'livebot', success };
+  }
+
+  async startFabuBotWithRetry(config) {
+    const success = await this.safeStartFabuBot();
+    if (!success) {
+      this.fabuBotRestartCount++;
+      await this.incrementRestartCount('fabubot');
+      error(`❌ FaBuBot 重启失败 (已尝试 ${this.fabuBotRestartCount}/${config.max_restart_attempts} 次)`);
+    } else {
+      this.fabuBotRestartCount = 0;
+      await this.resetRestartCount('fabubot');
+    }
+    return { bot: 'fabubot', success };
   }
 
   async safeStartBot() {

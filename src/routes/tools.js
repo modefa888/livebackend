@@ -1372,4 +1372,71 @@ router.post('/system/git/reset', authenticateToken, verifyAdmin, async (req, res
   }
 });
 
+router.get('/system/backup-records/check-files', authenticateToken, verifyAdmin, async (req, res) => {
+  try {
+    const backendDir = path.join(__dirname, '..', '..');
+    const frontendDir = path.join(backendDir, '..', 'frontend');
+    const backendBackupsDir = path.join(backendDir, 'backups');
+    const frontendBackupsDir = path.join(frontendDir, 'backups');
+    
+    const [records] = await db.execute(
+      'SELECT id, backupFileName, type FROM backup_records ORDER BY backupTime DESC'
+    );
+    
+    const localFiles = new Set();
+    
+    if (fs.existsSync(backendBackupsDir)) {
+      const backendFiles = fs.readdirSync(backendBackupsDir);
+      backendFiles.forEach(file => {
+        const name = file.replace('.zip', '');
+        localFiles.add(name);
+      });
+    }
+    
+    if (fs.existsSync(frontendBackupsDir)) {
+      const frontendFiles = fs.readdirSync(frontendBackupsDir);
+      frontendFiles.forEach(file => {
+        const name = file.replace('.zip', '');
+        localFiles.add(name);
+      });
+    }
+    
+    const missingRecords = records.filter(record => {
+      const baseName = record.backupFileName.replace('.zip', '');
+      return !localFiles.has(baseName);
+    });
+    
+    res.status(200).json({
+      success: true,
+      missingRecords: missingRecords,
+      totalChecked: records.length,
+      missingCount: missingRecords.length,
+      localFileCount: localFiles.size
+    });
+  } catch (error) {
+    res.status(500).json({ message: '检查备份文件失败', error: error.message });
+  }
+});
+
+router.delete('/system/backup-records/batch-delete', authenticateToken, verifyAdmin, async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: '请提供要删除的记录ID列表' });
+    }
+    const placeholders = ids.map(() => '?').join(',');
+    await db.execute(
+      `DELETE FROM backup_records WHERE id IN (${placeholders})`,
+      ids
+    );
+    res.status(200).json({
+      success: true,
+      message: `成功删除 ${ids.length} 条记录`,
+      deletedCount: ids.length
+    });
+  } catch (error) {
+    res.status(500).json({ message: '删除备份记录失败', error: error.message });
+  }
+});
+
 module.exports = router;
