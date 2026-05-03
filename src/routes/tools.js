@@ -1212,7 +1212,12 @@ router.post('/system/git/push', authenticateToken, verifyAdmin, async (req, res)
       return res.status(400).json({ success: false, message: '请先设置远程仓库' });
     }
     
-    const branch = execSync('git branch --show-current', { cwd: targetDir, encoding: 'utf-8' }).trim();
+    let branch = execSync('git branch --show-current', { cwd: targetDir, encoding: 'utf-8' }).trim();
+    
+    if (!branch) {
+      branch = 'main';
+      execSync(`git checkout -b ${branch}`, { cwd: targetDir });
+    }
     
     execSync(`git push -u origin ${branch}`, { cwd: targetDir });
     
@@ -1253,10 +1258,45 @@ router.post('/system/git/pull', authenticateToken, verifyAdmin, async (req, res)
   }
 });
 
-// 重命名分支
-router.post('/system/git/rename-branch', authenticateToken, verifyAdmin, async (req, res) => {
+// 删除远程分支
+router.post('/system/git/delete-branch', authenticateToken, verifyAdmin, async (req, res) => {
   try {
-    const { type, newName = 'main' } = req.body;
+    const { type, branchName } = req.body;
+    const rootDir = path.join(__dirname, '..', '..');
+    const targetDir = type === 'frontend' 
+      ? path.join(rootDir, '..', 'frontend') 
+      : rootDir;
+    
+    if (!checkGitInitialized(targetDir)) {
+      return res.status(400).json({ success: false, message: 'Git 仓库未初始化' });
+    }
+    
+    if (!branchName) {
+      return res.status(400).json({ success: false, message: '请提供要删除的分支名称' });
+    }
+    
+    const { execSync } = require('child_process');
+    
+    let hasOrigin = false;
+    try {
+      execSync('git remote get-url origin', { cwd: targetDir });
+      hasOrigin = true;
+    } catch (error) {
+      return res.status(400).json({ success: false, message: '请先设置远程仓库' });
+    }
+    
+    execSync(`git push origin --delete ${branchName}`, { cwd: targetDir });
+    
+    res.status(200).json({ success: true, message: `分支 ${branchName} 删除成功` });
+  } catch (error) {
+    res.status(500).json({ success: false, message: '删除分支失败', error: error.message });
+  }
+});
+
+// 获取远程分支列表
+router.get('/system/git/branches', authenticateToken, verifyAdmin, async (req, res) => {
+  try {
+    const { type } = req.query;
     const rootDir = path.join(__dirname, '..', '..');
     const targetDir = type === 'frontend' 
       ? path.join(rootDir, '..', 'frontend') 
@@ -1268,18 +1308,99 @@ router.post('/system/git/rename-branch', authenticateToken, verifyAdmin, async (
     
     const { execSync } = require('child_process');
     
+    const branches = execSync('git branch -r', { cwd: targetDir, encoding: 'utf-8' })
+      .trim()
+      .split('\n')
+      .map(line => line.trim().replace(/^origin\//, ''))
+      .filter(branch => branch);
+    
     const currentBranch = execSync('git branch --show-current', { cwd: targetDir, encoding: 'utf-8' }).trim();
     
-    if (currentBranch === newName) {
-      return res.status(200).json({ success: true, message: `分支已为 ${newName}` });
+    let defaultBranch = branches.includes('main') ? 'main' : (branches.includes('master') ? 'master' : branches[0] || 'main');
+    try {
+      const headRef = execSync('git symbolic-ref refs/remotes/origin/HEAD', { cwd: targetDir, encoding: 'utf-8', timeout: 5000 }).trim();
+      const detectedBranch = headRef.replace('refs/remotes/origin/', '');
+      if (detectedBranch && branches.includes(detectedBranch)) {
+        defaultBranch = detectedBranch;
+      }
+    } catch (error) {
+      console.log('无法检测远程默认分支，使用默认值:', defaultBranch);
     }
-    
-    execSync(`git branch -M ${newName}`, { cwd: targetDir });
     
     res.status(200).json({ 
       success: true, 
-      message: `分支从 ${currentBranch} 重命名为 ${newName} 成功`,
-      oldBranch: currentBranch,
+      branches: branches,
+      currentBranch: currentBranch,
+      defaultBranch: defaultBranch
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: '获取分支列表失败', error: error.message });
+  }
+});
+
+// 切换分支
+router.post('/system/git/checkout-branch', authenticateToken, verifyAdmin, async (req, res) => {
+  try {
+    const { type, branchName } = req.body;
+    const rootDir = path.join(__dirname, '..', '..');
+    const targetDir = type === 'frontend' 
+      ? path.join(rootDir, '..', 'frontend') 
+      : rootDir;
+    
+    if (!checkGitInitialized(targetDir)) {
+      return res.status(400).json({ success: false, message: 'Git 仓库未初始化' });
+    }
+    
+    if (!branchName) {
+      return res.status(400).json({ success: false, message: '请提供分支名称' });
+    }
+    
+    const { execSync } = require('child_process');
+    
+    execSync(`git checkout ${branchName}`, { cwd: targetDir });
+    
+    res.status(200).json({ success: true, message: `已切换到分支 ${branchName}` });
+  } catch (error) {
+    res.status(500).json({ success: false, message: '切换分支失败', error: error.message });
+  }
+});
+
+// 重命名分支
+router.post('/system/git/rename-branch', authenticateToken, verifyAdmin, async (req, res) => {
+  try {
+    const { type, oldName, newName } = req.body;
+    const rootDir = path.join(__dirname, '..', '..');
+    const targetDir = type === 'frontend' 
+      ? path.join(rootDir, '..', 'frontend') 
+      : rootDir;
+    
+    if (!checkGitInitialized(targetDir)) {
+      return res.status(400).json({ success: false, message: 'Git 仓库未初始化' });
+    }
+    
+    if (!oldName || !newName) {
+      return res.status(400).json({ success: false, message: '请提供原分支名称和新分支名称' });
+    }
+    
+    const { execSync } = require('child_process');
+    
+    if (oldName === newName) {
+      return res.status(200).json({ success: true, message: '新名称与原名称相同' });
+    }
+    
+    execSync(`git branch -m ${oldName} ${newName}`, { cwd: targetDir });
+    
+    try {
+      execSync(`git push origin :${oldName}`, { cwd: targetDir });
+      execSync(`git push origin ${newName}`, { cwd: targetDir });
+    } catch (error) {
+      console.log('远程分支重命名失败，可能远程不存在该分支');
+    }
+    
+    res.status(200).json({ 
+      success: true, 
+      message: `分支 ${oldName} 重命名为 ${newName} 成功`,
+      oldBranch: oldName,
       newBranch: newName
     });
   } catch (error) {
