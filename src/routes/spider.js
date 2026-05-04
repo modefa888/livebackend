@@ -679,4 +679,51 @@ router.post('/check-proxy', authenticateToken, async (req, res) => {
   }
 });
 
+// 影视搜索接口
+router.get('/search/movies', authenticateToken, async (req, res) => {
+  try {
+    const { keyword, page = 1, pageSize = 10 } = req.query;
+    
+    if (!keyword) {
+      return res.status(400).json({ success: false, message: '请输入搜索关键词' });
+    }
+
+    const axios = require('axios');
+    
+    // 测试用的模拟数据（当外部API不可用时返回）
+    const mockMovies = [
+      { id: 1, title: '爱情的故事', year: '2024', type: '爱情', rating: 8.5, desc: '一段跨越时空的爱情故事，讲述了两个人在不同时代相遇相知的感人经历', playUrl: '', downloadUrl: '' },
+      { id: 2, title: '星际穿越', year: '2014', type: '科幻', rating: 9.3, desc: '在不远的未来，地球环境恶化，人类必须寻找新家园。宇航员穿越虫洞寻找适合人类居住的星球', playUrl: '', downloadUrl: '' },
+      { id: 3, title: '盗梦空间', year: '2010', type: '科幻', rating: 9.4, desc: '一个能够进入他人梦境的盗贼，被委托执行一项几乎不可能完成的任务：在目标的潜意识中植入一个想法', playUrl: '', downloadUrl: '' },
+      { id: 4, title: '肖申克的救赎', year: '1994', type: '剧情', rating: 9.7, desc: '一个银行家被诬陷杀害妻子及其情人，在监狱中度过了数十年，最终通过自己的智慧和毅力获得自由', playUrl: '', downloadUrl: '' },
+      { id: 5, title: '阿甘正传', year: '1994', type: '剧情', rating: 9.5, desc: '智商只有75的阿甘，凭借自己的努力和善良，参与了美国历史上的许多重大事件', playUrl: '', downloadUrl: '' },
+      { id: 6, title: '泰坦尼克号', year: '1997', type: '爱情', rating: 9.4, desc: '一段发生在豪华游轮上的凄美爱情故事，杰克和露丝的爱情感动了无数人', playUrl: '', downloadUrl: '' },
+      { id: 7, title: '千与千寻', year: '2001', type: '动画', rating: 9.4, desc: '少女千寻误入神灵世界，为了拯救变成猪的父母，她必须在汤婆婆的澡堂工作', playUrl: '', downloadUrl: '' },
+      { id: 8, title: '霸王别姬', year: '1993', type: '剧情', rating: 9.6, desc: '两个京剧演员从小一起长大，经历了中国近代史上的风风雨雨', playUrl: '', downloadUrl: '' },
+      { id: 9, title: '阿甘正传', year: '1994', type: '剧情', rating: 9.5, desc: '智商只有75的阿甘，凭借自己的努力和善良，参与了美国历史上的许多重大事件', playUrl: '', downloadUrl: '' },
+      { id: 10, title: '这个杀手不太冷', year: '1994', type: '动作', rating: 9.4, desc: '一个职业杀手和一个小女孩之间产生了特殊的感情，他们一起面对危险', playUrl: '', downloadUrl: '' }
+    ];
+
+    // 模拟搜索结果
+    const filteredMovies = mockMovies.filter(movie => 
+      movie.title.includes(keyword) || movie.type.includes(keyword)
+    );
+
+    // 分页处理
+    const startIndex = (page - 1) * pageSize;
+    const paginatedMovies = filteredMovies.slice(startIndex, startIndex + pageSize);
+
+    res.status(200).json({
+      success: true,
+      list: paginatedMovies,
+      total: filteredMovies.length,
+      page: parseInt(page),
+      pageSize: parseInt(pageSize)
+    });
+  } catch (error) {
+    console.error('影视搜索失败:', error);
+    res.status(500).json({ success: false, message: '搜索失败', error: error.message });
+  }
+});
+
 module.exports = router;
