@@ -4,7 +4,8 @@ const { pool } = require('../../bots/fabuBot/config/database');
 
 // 中间件：验证JWT令牌
 const authenticateToken = async (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
+  // 支持从URL参数或Authorization头获取token
+  let token = req.query.token || req.headers.authorization?.split(' ')[1];
   
   if (!token) {
     return res.status(401).json({ message: '未提供认证令牌' });
@@ -56,50 +57,6 @@ router.get('/', authenticateToken, async (req, res) => {
     }
   } catch (error) {
     res.status(500).json({ message: '获取影视资源列表失败', error: error.message });
-  }
-});
-
-// 获取聚合影视资源
-router.get('/aggregated', authenticateToken, async (req, res) => {
-  try {
-    const { getVodSourceAggregator } = require('../services/vod-source-aggregator');
-    const aggregator = getVodSourceAggregator();
-    const result = await aggregator.getAggregatedSources();
-    res.status(200).json(result);
-  } catch (error) {
-    res.status(500).json({ message: '获取聚合影视资源失败', error: error.message });
-  }
-});
-
-// 按域名分组获取影视资源
-router.get('/by-domain', authenticateToken, async (req, res) => {
-  try {
-    const conn = await pool.getConnection();
-    try {
-      const [sources] = await conn.execute(
-        'SELECT * FROM fabubot_vod_sources WHERE deleted = 0 ORDER BY sort ASC'
-      );
-
-      const grouped = sources.reduce((acc, source) => {
-        let domain = source.url;
-        try {
-          const urlObj = new URL(source.url);
-          domain = urlObj.hostname;
-        } catch (e) {
-          const match = source.url.match(/^(?:https?:\/\/)?(?:[^@\n]+@)?(?:www\.)?([^:/\n]+)/i);
-          if (match) domain = match[1];
-        }
-        if (!acc[domain]) acc[domain] = [];
-        acc[domain].push(source);
-        return acc;
-      }, {});
-
-      res.status(200).json(grouped);
-    } finally {
-      conn.release();
-    }
-  } catch (error) {
-    res.status(500).json({ message: '按域名分组获取影视资源失败', error: error.message });
   }
 });
 
@@ -287,6 +244,156 @@ router.get('/search/aggregate', authenticateToken, async (req, res) => {
       message: '聚合搜索失败',
       error: error.message
     });
+  }
+});
+
+
+router.get('/search/aggregate/stream', authenticateToken, async (req, res) => {
+  const { keyword, category = 'all', pg = 1 } = req.query;
+
+  if (!keyword || !keyword.trim()) {
+    return res.status(400).json({ message: '请输入搜索关键词' });
+  }
+
+  // ✅ SSE 头
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  const send = (event, data) => {
+    try {
+      res.write(`event: ${event}\n`);
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    } catch (e) {
+      console.error('发送SSE数据失败:', e);
+    }
+  };
+
+  try {
+    // 获取资源站
+    const conn = await pool.getConnection();
+    let sources;
+    try {
+      let query = 'SELECT id, name, url FROM fabubot_vod_sources WHERE deleted = 0 AND enabled = 1';
+      const params = [];
+
+      if (category !== 'all') {
+        query += ' AND category = ?';
+        params.push(category);
+      }
+
+      query += ' ORDER BY sort ASC';
+
+      [sources] = await conn.execute(query, params);
+    } finally {
+      conn.release();
+    }
+
+    if (!sources.length) {
+      send('end', { total: 0 });
+      return res.end();
+    }
+
+    const axios = require('axios');
+    const pLimit = require('p-limit');
+    const limit = pLimit(5);
+
+    const axiosInstance = axios.create({
+      timeout: 8000,
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      httpAgent: new (require('http').Agent)({ keepAlive: true }),
+      httpsAgent: new (require('https').Agent)({ keepAlive: true })
+    });
+
+    const stripHtml = (str) => str ? str.replace(/<[^>]*>/g, '').trim() : '';
+
+    const parseEpisodes = (playUrl) => {
+      if (!playUrl) return [];
+      return playUrl.split('#').map(p => {
+        const [name, url] = p.split('$');
+        return name && url ? { name, url } : null;
+      }).filter(Boolean);
+    };
+
+    const seen = new Set();
+    let total = 0;
+
+    // 👉 单源搜索
+    const searchSource = async (source) => {
+      try {
+        let searchUrl = source.url;
+        if (searchUrl.includes('?')) {
+          searchUrl += `&ac=detail&wd=${encodeURIComponent(keyword)}&pg=${pg}`;
+        } else {
+          searchUrl += `?ac=detail&wd=${encodeURIComponent(keyword)}&pg=${pg}`;
+        }
+
+        const response = await axiosInstance.get(searchUrl);
+        const data = response.data;
+
+        let list = [];
+        if (Array.isArray(data?.list)) list = data.list;
+        else if (Array.isArray(data?.data)) list = data.data;
+
+        const results = [];
+
+        for (const item of list) {
+          const title = (item.vod_name || item.title || '').trim();
+          const key = title.toLowerCase();
+
+          if (!title || seen.has(key)) continue;
+          seen.add(key);
+
+          const playUrl = item.vod_play_url || item.play_url || '';
+
+          results.push({
+            title,
+            year: item.vod_year || '',
+            type: item.type_name || '',
+            pic: item.vod_pic || '',
+            sourceName: source.name,
+            sourceId: source.id,
+            episodes: parseEpisodes(playUrl),
+            desc: stripHtml(item.vod_content || '')
+          });
+        }
+
+        if (results.length > 0) {
+          total += results.length;
+
+          // 🚀 推送当前源结果
+          send('data', {
+            source: source.name,
+            count: results.length,
+            list: results
+          });
+        }
+
+      } catch (err) {
+        send('error', {
+          source: source.name,
+          message: err.message
+        });
+      }
+    };
+
+    // 👉 并发执行（边完成边推送）
+    await Promise.allSettled(
+      sources.map(source => limit(() => searchSource(source)))
+    );
+
+    // ✅ 结束
+    send('end', {
+      total,
+      searchedSources: sources.length
+    });
+
+    res.end();
+
+  } catch (error) {
+    send('error', { message: error.message });
+    res.end();
   }
 });
 
@@ -640,7 +747,7 @@ router.post('/:id/ping', authenticateToken, async (req, res) => {
       const ping = Date.now() - startTime;
       
       await pool.execute(
-        'UPDATE fabubot_vod_sources SET ping = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        'UPDATE fabubot_vod_sources SET ping = ?, enabled = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
         [ping, id]
       );
 
@@ -661,24 +768,34 @@ router.post('/:id/ping', authenticateToken, async (req, res) => {
 // 批量测试延迟
 router.post('/ping/batch', authenticateToken, verifyAdmin, async (req, res) => {
   try {
+    const { ids } = req.body;
+    
     const conn = await pool.getConnection();
     let sources;
     try {
-      [sources] = await conn.execute(
-        'SELECT id, url FROM fabubot_vod_sources WHERE deleted = 0 AND enabled = 1'
-      );
+      let query = 'SELECT id, url FROM fabubot_vod_sources WHERE deleted = 0';
+      const params = [];
+      
+      if (ids && Array.isArray(ids) && ids.length > 0) {
+        query += ' AND id IN (?)';
+        params.push(ids);
+      }
+      
+      [sources] = await conn.execute(query, params);
     } finally {
       conn.release();
     }
 
     const axios = require('axios');
+    const pLimit = require('p-limit');
+    const limit = pLimit(5); // 限制并发数为5
     const results = [];
 
-    for (const source of sources) {
+    const testSource = async (source) => {
       const startTime = Date.now();
       try {
         await axios.get(source.url, {
-          timeout: 15000,
+          timeout: 10000,
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
           }
@@ -687,7 +804,7 @@ router.post('/ping/batch', authenticateToken, verifyAdmin, async (req, res) => {
         const ping = Date.now() - startTime;
         
         await pool.execute(
-          'UPDATE fabubot_vod_sources SET ping = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+          'UPDATE fabubot_vod_sources SET ping = ?, enabled = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
           [ping, source.id]
         );
 
@@ -700,7 +817,11 @@ router.post('/ping/batch', authenticateToken, verifyAdmin, async (req, res) => {
         
         results.push({ id: source.id, success: false, message: error.message });
       }
-    }
+    };
+
+    await Promise.allSettled(
+      sources.map(source => limit(() => testSource(source)))
+    );
 
     res.status(200).json({ success: true, results });
   } catch (error) {

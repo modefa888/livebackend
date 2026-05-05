@@ -40,6 +40,7 @@ const fabuBotRoutes = require('./src/routes/fabu-bot');
 const spiderApiRoutes = require('./src/routes/spider-api');
 const spiderDynamicRoutes = require('./src/routes/spider-dynamic');
 const vodSourcesRoutes = require('./src/routes/vod-sources');
+const vodAggregatedRoutes = require('./src/routes/vod-aggregated');
 
 // 导入爬虫接口动态加载器
 const spiderLoader = require('./src/services/spider/spider-loader');
@@ -71,6 +72,7 @@ app.use(express.urlencoded({ extended: true }));
 // 静态资源服务
 app.use('/images', express.static('public/images'));
 app.use('/api/scripts', express.static('src/public/scripts'));
+app.use('/api/html', express.static('src/public/html'));
 
 // 统计请求次数的中间件
 app.use((req, res, next) => {
@@ -105,6 +107,7 @@ app.use('/api/site-info', siteInfoRoutes);
 app.use('/api/parse-records', parseRecordsRoutes);
 app.use('/api/fabu-bot', fabuBotRoutes);
 app.use('/api/vod-sources', vodSourcesRoutes);
+app.use('/api/vod-aggregated', vodAggregatedRoutes);
 app.use('/api/spider-api', spiderApiRoutes);
 app.use('/spider-api', spiderDynamicRoutes);
 app.use('/', uploadSiteRoutes);
