@@ -37,6 +37,133 @@ router.get('/', async (req, res) => {
   }
 })
 
+// 扫描本地HTML文件，找出未在数据库中保存的文件（管理员）
+router.get('/scan-local-files', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1]
+    if (!token) {
+      return res.status(401).json({ error: '未授权' })
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key')
+    
+    const [users] = await db.execute('SELECT id, userId, username, permissionLevel FROM users WHERE id = ?', [decoded.id])
+    
+    if (users.length === 0 || users[0].permissionLevel < 2) {
+      return res.status(403).json({ error: '权限不足' })
+    }
+
+    // 获取数据库中已保存的文件名
+    const [dbPages] = await db.execute('SELECT content FROM pages')
+    const dbFiles = new Set(dbPages.map(p => p.content))
+
+    // 扫描本地HTML文件夹
+    const files = await fs.promises.readdir(HTML_DIR)
+    const htmlFiles = files.filter(file => file.endsWith('.html'))
+    
+    // 找出未保存的文件
+    const unsavedFiles = []
+    for (const filename of htmlFiles) {
+      if (!dbFiles.has(filename)) {
+        const filepath = path.join(HTML_DIR, filename)
+        const stats = await fs.promises.stat(filepath)
+        const content = await fs.promises.readFile(filepath, 'utf-8')
+        
+        // 自动生成标题：从文件名或HTML标题标签获取
+        let title = filename.replace('.html', '')
+        const titleMatch = content.match(/<title>([^<]+)<\/title>/i)
+        if (titleMatch && titleMatch[1]) {
+          title = titleMatch[1].trim()
+        }
+        
+        // 自动生成路径：去除.html后缀，使用文件名作为路径
+        const pagePath = filename.replace('.html', '')
+        
+        unsavedFiles.push({
+          filename,
+          title,
+          path: pagePath,
+          size: stats.size,
+          lastModified: stats.mtime.toISOString(),
+          content
+        })
+      }
+    }
+
+    res.json({
+      success: true,
+      unsavedFiles,
+      totalFiles: htmlFiles.length,
+      savedCount: dbFiles.size,
+      unsavedCount: unsavedFiles.length
+    })
+  } catch (error) {
+    console.error('扫描本地文件失败:', error)
+    res.status(500).json({ error: '服务器内部错误' })
+  }
+})
+
+// 批量添加未保存的文件到数据库（管理员）
+router.post('/import-local-files', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1]
+    if (!token) {
+      return res.status(401).json({ error: '未授权' })
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key')
+    
+    const [users] = await db.execute('SELECT id, userId, username, permissionLevel FROM users WHERE id = ?', [decoded.id])
+    
+    if (users.length === 0 || users[0].permissionLevel < 2) {
+      return res.status(403).json({ error: '权限不足' })
+    }
+
+    const { files } = req.body
+    if (!files || !Array.isArray(files) || files.length === 0) {
+      return res.status(400).json({ error: '请选择要导入的文件' })
+    }
+
+    const results = []
+    for (const file of files) {
+      const { filename, title, path: pagePath, content, require_login = false, status = true } = file
+      
+      try {
+        // 检查是否已存在
+        const [existingPages] = await db.execute('SELECT id FROM pages WHERE path = ?', [pagePath])
+        if (existingPages.length > 0) {
+          results.push({ filename, success: false, error: '页面路径已存在' })
+          continue
+        }
+
+        await db.execute(
+          'INSERT INTO pages (title, path, content, require_login, status) VALUES (?, ?, ?, ?, ?)',
+          [title, pagePath, filename, require_login ? 1 : 0, status ? 1 : 1]
+        )
+        
+        results.push({ filename, success: true, title, path: pagePath })
+      } catch (error) {
+        console.error(`导入文件 ${filename} 失败:`, error)
+        results.push({ filename, success: false, error: '导入失败' })
+      }
+    }
+
+    const successCount = results.filter(r => r.success).length
+    const failCount = results.length - successCount
+
+    res.json({
+      success: true,
+      results,
+      successCount,
+      failCount,
+      message: `成功导入 ${successCount} 个文件，失败 ${failCount} 个`
+    })
+  } catch (error) {
+    console.error('批量导入失败:', error)
+    res.status(500).json({ error: '服务器内部错误' })
+  }
+})
+
 // 创建页面（管理员）
 router.post('/', async (req, res) => {
   try {
@@ -76,6 +203,43 @@ router.post('/', async (req, res) => {
     res.json({ success: true, id: result.insertId, message: '页面创建成功' })
   } catch (error) {
     console.error('创建页面失败:', error)
+    res.status(500).json({ error: '服务器内部错误' })
+  }
+})
+
+// 获取单个页面详情（用于编辑）
+router.get('/:id', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1]
+    if (!token) {
+      return res.status(401).json({ error: '未授权' })
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key')
+    
+    const [users] = await db.execute('SELECT id, userId, username, permissionLevel FROM users WHERE id = ?', [decoded.id])
+    
+    if (users.length === 0 || users[0].permissionLevel < 2) {
+      return res.status(403).json({ error: '权限不足' })
+    }
+
+    const { id } = req.params
+    
+    const [pages] = await db.execute('SELECT * FROM pages WHERE id = ?', [id])
+    if (pages.length === 0) {
+      return res.status(404).json({ error: '页面不存在' })
+    }
+
+    const page = pages[0]
+    const filepath = path.join(HTML_DIR, page.content)
+    let content = ''
+    if (fs.existsSync(filepath)) {
+      content = await fs.promises.readFile(filepath, 'utf-8')
+    }
+
+    res.json({ success: true, page: { ...page, content: content } })
+  } catch (error) {
+    console.error('获取页面详情失败:', error)
     res.status(500).json({ error: '服务器内部错误' })
   }
 })
@@ -176,7 +340,7 @@ router.delete('/:id', async (req, res) => {
   }
 })
 
-// 访问页面（公开接口）
+// 访问页面（公开接口）- 这个路由要放在最后，避免拦截其他路由
 router.get('/view/:path', async (req, res) => {
   try {
     const { path: pagePath } = req.params
@@ -219,43 +383,6 @@ router.get('/view/:path', async (req, res) => {
     res.json({ success: true, page: { id: page.id, title: page.title, content: content, created_at: page.created_at, updated_at: page.updated_at } })
   } catch (error) {
     console.error('访问页面失败:', error)
-    res.status(500).json({ error: '服务器内部错误' })
-  }
-})
-
-// 获取单个页面详情（用于编辑）
-router.get('/:id', async (req, res) => {
-  try {
-    const token = req.headers.authorization?.split(' ')[1]
-    if (!token) {
-      return res.status(401).json({ error: '未授权' })
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key')
-    
-    const [users] = await db.execute('SELECT id, userId, username, permissionLevel FROM users WHERE id = ?', [decoded.id])
-    
-    if (users.length === 0 || users[0].permissionLevel < 2) {
-      return res.status(403).json({ error: '权限不足' })
-    }
-
-    const { id } = req.params
-    
-    const [pages] = await db.execute('SELECT * FROM pages WHERE id = ?', [id])
-    if (pages.length === 0) {
-      return res.status(404).json({ error: '页面不存在' })
-    }
-
-    const page = pages[0]
-    const filepath = path.join(HTML_DIR, page.content)
-    let content = ''
-    if (fs.existsSync(filepath)) {
-      content = await fs.promises.readFile(filepath, 'utf-8')
-    }
-
-    res.json({ success: true, page: { ...page, content: content } })
-  } catch (error) {
-    console.error('获取页面详情失败:', error)
     res.status(500).json({ error: '服务器内部错误' })
   }
 })

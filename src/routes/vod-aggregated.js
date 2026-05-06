@@ -99,6 +99,109 @@ router.get('/by-domain', authenticateToken, async (req, res) => {
   }
 });
 
+// 批量测试延迟（注意：必须放在 /ping/:id 前面！）- 使用 SSE 流来支持实时进度！
+router.post('/ping/batch', authenticateToken, async (req, res) => {
+  // 设置 SSE 头
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  try {
+    const { ids } = req.body;
+
+    const conn = await pool.getConnection();
+    let sources;
+    try {
+      let query = 'SELECT id, name, url FROM fabubot_vod_sources WHERE deleted = 0';
+      const params = [];
+
+      if (ids && Array.isArray(ids) && ids.length > 0) {
+        query += ' AND id IN (?)';
+        params.push(ids);
+      }
+
+      [sources] = await conn.execute(query, params);
+    } finally {
+      conn.release();
+    }
+
+    const axios = require('axios');
+    const pLimit = require('p-limit');
+    const limit = pLimit(5);
+    const results = [];
+    let completed = 0;
+    const total = sources.length;
+
+    const testSource = async (source) => {
+      const startTime = Date.now();
+      try {
+        await axios.get(source.url, {
+          timeout: 10000,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          }
+        });
+
+        const ping = Date.now() - startTime;
+
+        await pool.execute(
+          'UPDATE fabubot_vod_sources SET ping = ?, enabled = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+          [ping, source.id]
+        );
+
+        const result = { id: source.id, name: source.name, success: true, ping };
+        results.push(result);
+        
+        // 发送进度事件
+        completed++;
+        res.write(`event: progress\n`);
+        res.write(`data: ${JSON.stringify({
+          current: completed,
+          total: total,
+          percent: Math.round((completed / total) * 100),
+          result: result
+        })}\n\n`);
+      } catch (error) {
+        await pool.execute(
+          'UPDATE fabubot_vod_sources SET ping = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+          [source.id]
+        );
+
+        const result = { id: source.id, name: source.name, success: false, message: error.message };
+        results.push(result);
+        
+        // 发送进度事件
+        completed++;
+        res.write(`event: progress\n`);
+        res.write(`data: ${JSON.stringify({
+          current: completed,
+          total: total,
+          percent: Math.round((completed / total) * 100),
+          result: result
+        })}\n\n`);
+      }
+    };
+
+    // 发送开始事件
+    res.write(`event: start\n`);
+    res.write(`data: ${JSON.stringify({ total: total })}\n\n`);
+
+    await Promise.allSettled(
+      sources.map(source => limit(() => testSource(source)))
+    );
+
+    // 发送结束事件
+    res.write(`event: end\n`);
+    res.write(`data: ${JSON.stringify({ success: true, results: results })}\n\n`);
+    res.end();
+  } catch (error) {
+    res.write(`event: error\n`);
+    res.write(`data: ${JSON.stringify({ message: '批量测试延迟失败', error: error.message })}\n\n`);
+    res.end();
+  }
+});
+
 // 测试单个资源延迟
 router.post('/ping/:id', authenticateToken, async (req, res) => {
   try {
@@ -152,70 +255,6 @@ router.post('/ping/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// 批量测试延迟
-router.post('/ping/batch', authenticateToken, async (req, res) => {
-  try {
-    const { ids } = req.body;
-
-    const conn = await pool.getConnection();
-    let sources;
-    try {
-      let query = 'SELECT id, url FROM fabubot_vod_sources WHERE deleted = 0';
-      const params = [];
-
-      if (ids && Array.isArray(ids) && ids.length > 0) {
-        query += ' AND id IN (?)';
-        params.push(ids);
-      }
-
-      [sources] = await conn.execute(query, params);
-    } finally {
-      conn.release();
-    }
-
-    const axios = require('axios');
-    const pLimit = require('p-limit');
-    const limit = pLimit(5);
-    const results = [];
-
-    const testSource = async (source) => {
-      const startTime = Date.now();
-      try {
-        await axios.get(source.url, {
-          timeout: 10000,
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          }
-        });
-
-        const ping = Date.now() - startTime;
-
-        await pool.execute(
-          'UPDATE fabubot_vod_sources SET ping = ?, enabled = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-          [ping, source.id]
-        );
-
-        results.push({ id: source.id, success: true, ping });
-      } catch (error) {
-        await pool.execute(
-          'UPDATE fabubot_vod_sources SET ping = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-          [source.id]
-        );
-
-        results.push({ id: source.id, success: false, message: error.message });
-      }
-    };
-
-    await Promise.allSettled(
-      sources.map(source => limit(() => testSource(source)))
-    );
-
-    res.status(200).json({ success: true, results });
-  } catch (error) {
-    res.status(500).json({ message: '批量测试延迟失败', error: error.message });
-  }
-});
-
 // 聚合搜索接口
 router.get('/search/aggregate', authenticateToken, async (req, res) => {
   try {
@@ -258,7 +297,6 @@ router.get('/search/aggregate', authenticateToken, async (req, res) => {
         searchedSources: 0,
         successSources: 0
       };
-      saveToCache(keyword, category, 1, 'aggregate', result);
       return res.json(result);
     }
 
@@ -443,9 +481,13 @@ router.get('/search/aggregate', authenticateToken, async (req, res) => {
       successSources: results.filter(r => r.status === 'fulfilled' && r.value.length > 0).length
     };
 
-    // 保存缓存（不等待）
-    saveToCache(keyword, category, 1, 'aggregate', finalResult);
-    console.log(`[搜索缓存] 已保存: ${keyword}, ${allMovies.length} 个结果`);
+    // 只在有数据时才保存缓存
+    if (finalResult.total > 0) {
+      saveToCache(keyword, category, 1, 'aggregate', finalResult);
+      console.log(`[搜索缓存] 已保存: ${keyword}, ${allMovies.length} 个结果`);
+    } else {
+      console.log(`[搜索缓存] 无结果，不保存缓存: ${keyword}`);
+    }
 
     res.status(200).json(finalResult);
   } catch (error) {
@@ -742,9 +784,17 @@ router.get('/search/aggregate/stream/public', async (req, res) => {
 
     res.end();
 
-    // 异步保存缓存（不等待）
-    saveToCache(keyword, category, pg, 'stream_public', cachedEvents);
-    console.log(`[搜索缓存] 已保存: ${keyword}, ${cachedEvents.length} events`);
+    // 只在有数据时才保存缓存 - 检查是否有data事件且有结果
+    const hasData = cachedEvents.some(event => 
+      event.event === 'data' && event.data.list && event.data.list.length > 0
+    );
+    
+    if (hasData) {
+      saveToCache(keyword, category, pg, 'stream_public', cachedEvents);
+      console.log(`[搜索缓存] 已保存: ${keyword}, ${cachedEvents.length} events`);
+    } else {
+      console.log(`[搜索缓存] 无结果，不保存缓存: ${keyword}`);
+    }
 
   } catch (error) {
     if (!connectionClosed) {
@@ -821,7 +871,6 @@ router.get('/search/aggregate/stream', authenticateToken, async (req, res) => {
 
     if (!sources.length) {
       send('end', { total: 0 });
-      saveToCache(keyword, category, pg, 'stream_auth', cachedEvents);
       return res.end();
     }
 
@@ -1013,9 +1062,17 @@ router.get('/search/aggregate/stream', authenticateToken, async (req, res) => {
 
     res.end();
 
-    // 异步保存缓存（不等待）
-    saveToCache(keyword, category, pg, 'stream_auth', cachedEvents);
-    console.log(`[搜索缓存] 已保存: ${keyword}, ${cachedEvents.length} events`);
+    // 只在有数据时才保存缓存 - 检查是否有data事件且有结果
+    const hasData = cachedEvents.some(event => 
+      event.event === 'data' && event.data.list && event.data.list.length > 0
+    );
+    
+    if (hasData) {
+      saveToCache(keyword, category, pg, 'stream_auth', cachedEvents);
+      console.log(`[搜索缓存] 已保存: ${keyword}, ${cachedEvents.length} events`);
+    } else {
+      console.log(`[搜索缓存] 无结果，不保存缓存: ${keyword}`);
+    }
 
   } catch (error) {
     send('error', { message: error.message });

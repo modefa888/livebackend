@@ -41,6 +41,7 @@ const spiderApiRoutes = require('./src/routes/spider-api');
 const spiderDynamicRoutes = require('./src/routes/spider-dynamic');
 const vodSourcesRoutes = require('./src/routes/vod-sources');
 const vodAggregatedRoutes = require('./src/routes/vod-aggregated');
+const favoritesRoutes = require('./src/routes/favorites');
 
 // 导入爬虫接口动态加载器
 const spiderLoader = require('./src/services/spider/spider-loader');
@@ -108,6 +109,7 @@ app.use('/api/parse-records', parseRecordsRoutes);
 app.use('/api/fabu-bot', fabuBotRoutes);
 app.use('/api/vod-sources', vodSourcesRoutes);
 app.use('/api/vod-aggregated', vodAggregatedRoutes);
+app.use('/api/favorites', favoritesRoutes);
 app.use('/api/spider-api', spiderApiRoutes);
 app.use('/spider-api', spiderDynamicRoutes);
 app.use('/', uploadSiteRoutes);

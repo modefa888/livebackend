@@ -390,4 +390,63 @@ router.post('/delete_by_href', authenticateToken, async (req, res) => {
   }
 });
 
+// 公共接口 - 分页获取数据（不需要认证）
+router.get('/public-data', async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const page_size = parseInt(req.query.page_size) || 12;
+        const offset = (page - 1) * page_size;
+
+        const [countResult] = await db.execute('SELECT COUNT(*) as total FROM site_info');
+        const total_count = countResult[0].total;
+
+        const [results] = await db.execute(
+            'SELECT id, page_title, page_href, page_img, m3u8_list, view_count, stars, create_time, local_img_path FROM site_info ORDER BY id DESC LIMIT ? OFFSET ?',
+            [page_size, offset]
+        );
+
+        const data_list = results.map(row => {
+            const decryptedM3u8List = aes_decrypt(row.m3u8_list);
+            let m3u8_list = [];
+            try {
+                m3u8_list = decryptedM3u8List ? JSON.parse(decryptedM3u8List) : [];
+            } catch {
+                m3u8_list = [];
+            }
+            return {
+                id: row.id,
+                page_title: aes_decrypt(row.page_title),
+                page_href: aes_decrypt(row.page_href),
+                page_img: aes_decrypt(row.page_img),
+                m3u8_list: m3u8_list,
+                view_count: row.view_count,
+                stars: row.stars,
+                create_time: row.create_time,
+                local_img_path: row.local_img_path || ''
+            };
+        });
+
+        res.status(200).json({
+            code: 200,
+            message: '查询成功',
+            data: data_list,
+            total_count: total_count,
+            current_page: page,
+            page_size: page_size,
+            total_pages: Math.ceil(total_count / page_size)
+        });
+    } catch (error) {
+        console.error('查询数据失败:', error);
+        res.status(500).json({
+            code: 500,
+            message: '查询数据失败',
+            data: [],
+            total_count: 0,
+            current_page: 1,
+            page_size: 12,
+            total_pages: 1
+        });
+    }
+});
+
 module.exports = router;

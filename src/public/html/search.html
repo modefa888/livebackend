@@ -407,6 +407,31 @@
             color: white;
             border-color: #667eea;
         }
+        .favorite-btn {
+            padding: 10px 25px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 15px;
+        }
+        .favorite-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
+        }
+        .favorite-btn.favorited {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+        .favorite-btn.favorited:hover {
+            box-shadow: 0 4px 15px rgba(17, 153, 142, 0.4);
+        }
         .player-container {
             background: #000;
             border-radius: 8px;
@@ -802,6 +827,12 @@
             if (item.pubdate) detailsHtml += `<div class="detail-row"><span class="detail-label">首播</span><span class="detail-value">${item.pubdate}</span></div>`;
             detailsHtml += `<div class="detail-row"><span class="detail-label">来源</span><span class="detail-value">${item.sourceName}</span></div>`;
 
+            // 重置收藏状态
+            isFavorited = false;
+            
+            // 检查是否已收藏
+            checkFavorite(item.id);
+            
             document.getElementById('movieInfo').innerHTML = `
                 <div class="movie-info">
                     ${item.pic
@@ -811,6 +842,9 @@
                     <div class="movie-details">
                         <h3>${item.title}</h3>
                         ${detailsHtml}
+                        <button id="favoriteBtn" class="favorite-btn" onclick="toggleFavorite(allResults[${index}])">
+                            🤍 收藏
+                        </button>
                     </div>
                 </div>
                 ${item.desc ? `
@@ -962,6 +996,81 @@
             }
         });
 
+        // 收藏功能相关
+        let isFavorited = false;
+        
+        async function checkFavorite(vodId) {
+            try {
+                const response = await fetch(`${API_BASE}/api/favorites/check/${vodId}`);
+                const data = await response.json();
+                isFavorited = data.isFavorited;
+                updateFavoriteBtn();
+            } catch (e) {
+                console.log('检查收藏状态失败:', e);
+            }
+        }
+        
+        async function toggleFavorite(item) {
+            try {
+                if (isFavorited) {
+                    // 取消收藏
+                    await fetch(`${API_BASE}/api/favorites/${item.id}`, {
+                        method: 'DELETE'
+                    });
+                    isFavorited = false;
+                    alert('已取消收藏');
+                } else {
+                    // 添加收藏 - 把当前搜索数据转换为收藏格式
+                    const favoriteData = {
+                        vod_id: item.id,
+                        vod_name: item.title,
+                        vod_year: item.year,
+                        vod_type: item.type,
+                        vod_content: item.desc,
+                        vod_pic: item.pic,
+                        vod_pic_thumb: item.picThumb,
+                        vod_pic_slide: item.picSlide,
+                        vod_actor: item.actor,
+                        vod_director: item.director,
+                        vod_remarks: item.remarks,
+                        vod_area: item.area,
+                        vod_lang: item.lang,
+                        vod_pubdate: item.pubdate,
+                        vod_play_from: item.playFrom,
+                        source_name: item.sourceName,
+                        source_id: item.sourceId,
+                        episodes: item.episodes
+                    };
+                    
+                    const response = await fetch(`${API_BASE}/api/favorites`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(favoriteData)
+                    });
+                    
+                    if (response.ok) {
+                        isFavorited = true;
+                        alert('收藏成功！');
+                    } else {
+                        const data = await response.json();
+                        alert(data.error || '收藏失败');
+                    }
+                }
+                updateFavoriteBtn();
+            } catch (e) {
+                console.error('操作失败:', e);
+                alert('操作失败，请稍后再试');
+            }
+        }
+        
+        function updateFavoriteBtn() {
+            const btn = document.getElementById('favoriteBtn');
+            if (btn) {
+                btn.classList.toggle('favorited', isFavorited);
+                btn.innerHTML = isFavorited ? '❤️ 已收藏' : '🤍 收藏';
+            }
+        }
+        
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') closeModal();
         });
