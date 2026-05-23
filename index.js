@@ -56,9 +56,6 @@ const { getBotGuard } = require('./src/services/bot/bot-guard');
 // 导入爬虫管理模块
 const spiderManager = require('./src/services/spider/spider-manager');
 
-// 导入影视资源监控模块
-const { getVodSourceMonitor } = require('./src/services/vod-source-monitor');
-
 const app = express();
 const PORT = process.env[`${process.env.ENVIRONMENT.toUpperCase()}_BACKEND_PORT`] || 3002;
 
@@ -67,8 +64,8 @@ let requestCount = 0;
 
 // 中间件
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // 静态资源服务
 app.use('/images', express.static('public/images'));
@@ -183,15 +180,6 @@ const gracefulShutdown = async (signal) => {
         error('关闭爬虫服务出错:', err);
       }
       
-      // 6. 关闭影视资源监控
-      try {
-        const vodSourceMonitor = getVodSourceMonitor();
-        vodSourceMonitor.stop();
-        info('影视资源监控已停止');
-      } catch (err) {
-        error('关闭影视资源监控出错:', err);
-      }
-
       process.exit(0);
     });
   } else {
@@ -245,15 +233,6 @@ async function startServer() {
         info('✅ BotGuard 机器人守护服务启动完成');
       } catch (botGuardError) {
         error('⚠️ BotGuard 机器人守护服务启动失败:', botGuardError);
-      }
-      
-      // 启动影视资源监控
-      try {
-        const vodSourceMonitor = getVodSourceMonitor();
-        await vodSourceMonitor.start();
-        info('✅ 影视资源自动测速监控启动完成');
-      } catch (vodSourceError) {
-        error('⚠️ 影视资源自动测速监控启动失败:', vodSourceError);
       }
     });
 

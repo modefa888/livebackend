@@ -258,14 +258,14 @@ router.post('/ping/:id', authenticateToken, async (req, res) => {
 // 聚合搜索接口
 router.get('/search/aggregate', authenticateToken, async (req, res) => {
   try {
-    const { keyword, category = 'all' } = req.query;
+    const { keyword, category = 'all', pg = 1 } = req.query;
 
     if (!keyword || !keyword.trim()) {
       return res.status(400).json({ success: false, message: '请输入搜索关键词' });
     }
 
     // 检查缓存
-    const cached = getFromCache(keyword, category, 1, 'aggregate');
+    const cached = getFromCache(keyword, category, pg, 'aggregate');
     if (cached) {
       console.log(`[搜索缓存] 命中缓存: ${keyword}`);
       return res.status(200).json(cached.data);
@@ -411,9 +411,9 @@ router.get('/search/aggregate', authenticateToken, async (req, res) => {
       try {
         let searchUrl = source.url;
         if (searchUrl.includes('?')) {
-          searchUrl += `&ac=detail&wd=${encodeURIComponent(keyword)}`;
+          searchUrl += `&ac=detail&wd=${encodeURIComponent(keyword)}&pg=${pg}`;
         } else {
-          searchUrl += `?ac=detail&wd=${encodeURIComponent(keyword)}`;
+          searchUrl += `?ac=detail&wd=${encodeURIComponent(keyword)}&pg=${pg}`;
         }
 
         const response = await axiosInstance.get(searchUrl);
@@ -483,7 +483,7 @@ router.get('/search/aggregate', authenticateToken, async (req, res) => {
 
     // 只在有数据时才保存缓存
     if (finalResult.total > 0) {
-      saveToCache(keyword, category, 1, 'aggregate', finalResult);
+      saveToCache(keyword, category, pg, 'aggregate', finalResult);
       console.log(`[搜索缓存] 已保存: ${keyword}, ${allMovies.length} 个结果`);
     } else {
       console.log(`[搜索缓存] 无结果，不保存缓存: ${keyword}`);
@@ -693,7 +693,8 @@ router.get('/search/aggregate/stream/public', async (req, res) => {
 
     const seen = new Set();
     let total = 0;
-    let completedCount = 0;
+    let successSources = 0;
+    let failedSources = 0;
 
     // 单源搜索
     const searchSource = async (source) => {
@@ -715,6 +716,7 @@ router.get('/search/aggregate/stream/public', async (req, res) => {
         else if (Array.isArray(data?.data)) list = data.data;
 
         const results = [];
+        let index = 0;
 
         for (const item of list) {
                     const title = (item.vod_name || item.title || '').trim();
@@ -724,7 +726,7 @@ router.get('/search/aggregate/stream/public', async (req, res) => {
                     seen.add(key);
 
                     results.push({
-                        id: item.vod_id || item.id || `${source.id}-${index}`,
+                        id: item.vod_id || item.id || `${source.id}-${index++}`,
                         title,
                         year: item.vod_year || item.year || '',
                         type: item.type_name || item.type || '未知',
@@ -747,6 +749,7 @@ router.get('/search/aggregate/stream/public', async (req, res) => {
 
         if (results.length > 0) {
           total += results.length;
+          successSources++;
 
           // 推送当前源结果
           send('data', {
@@ -754,9 +757,13 @@ router.get('/search/aggregate/stream/public', async (req, res) => {
             count: results.length,
             list: results
           });
+        } else {
+          // 即使没有结果也记录成功源
+          successSources++;
         }
 
       } catch (err) {
+        failedSources++;
         // 只在连接还在时发送错误
         if (!connectionClosed) {
           send('error', {
@@ -764,8 +771,6 @@ router.get('/search/aggregate/stream/public', async (req, res) => {
             message: err.message
           });
         }
-      } finally {
-        completedCount++;
       }
     };
 
@@ -778,7 +783,9 @@ router.get('/search/aggregate/stream/public', async (req, res) => {
     if (!connectionClosed) {
       send('end', {
         total,
-        searchedSources: sources.length
+        searchedSources: sources.length,
+        successSources,
+        failedSources
       });
     }
 

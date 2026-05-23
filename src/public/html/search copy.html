@@ -1034,193 +1034,6 @@
             transform: scale(1.1);
             box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
         }
-        
-        /* 登录模态框样式 */
-        .login-modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.7);
-            z-index: 3000;
-            overflow-y: auto;
-            padding: 20px;
-        }
-        .login-modal.active {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .login-modal-content {
-            background: white;
-            border-radius: 20px;
-            max-width: 400px;
-            width: 100%;
-            overflow: hidden;
-            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.3);
-            animation: slideUp 0.3s ease;
-        }
-        .login-modal-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 25px;
-            text-align: center;
-        }
-        .login-modal-header h2 {
-            margin: 0;
-            font-size: 24px;
-        }
-        .login-modal-body {
-            padding: 30px;
-        }
-        .login-form-group {
-            margin-bottom: 20px;
-        }
-        .login-form-group label {
-            display: block;
-            margin-bottom: 8px;
-            color: #333;
-            font-weight: 500;
-        }
-        .login-form-group input {
-            width: 100%;
-            padding: 12px 16px;
-            border: 2px solid #e5e7eb;
-            border-radius: 10px;
-            font-size: 16px;
-            box-sizing: border-box;
-            transition: all 0.3s;
-        }
-        .login-form-group input:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
-        }
-        .login-btn {
-            width: 100%;
-            padding: 14px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        .login-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-        }
-        .login-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-        .login-close-btn {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            background: rgba(255,255,255,0.2);
-            border: none;
-            color: white;
-            font-size: 28px;
-            cursor: pointer;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background 0.2s;
-        }
-        .login-close-btn:hover {
-            background: rgba(255,255,255,0.3);
-        }
-        
-        /* 删除确认模态框样式 */
-        .delete-confirm-modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.7);
-            z-index: 3001;
-            overflow-y: auto;
-            padding: 20px;
-        }
-        .delete-confirm-modal.active {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .delete-confirm-content {
-            background: white;
-            border-radius: 20px;
-            max-width: 350px;
-            width: 100%;
-            overflow: hidden;
-            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.3);
-            animation: slideUp 0.3s ease;
-        }
-        .delete-confirm-header {
-            background: linear-gradient(135deg, #ff4757 0%, #ff6b81 100%);
-            color: white;
-            padding: 25px;
-            text-align: center;
-        }
-        .delete-confirm-header h2 {
-            margin: 0;
-            font-size: 20px;
-        }
-        .delete-confirm-body {
-            padding: 30px;
-            text-align: center;
-        }
-        .delete-confirm-body p {
-            margin: 0 0 25px 0;
-            color: #666;
-            font-size: 15px;
-            line-height: 1.6;
-        }
-        .delete-confirm-buttons {
-            display: flex;
-            gap: 12px;
-        }
-        .delete-confirm-btn {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: 10px;
-            font-size: 15px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        .delete-confirm-btn.cancel {
-            background: #f1f2f6;
-            color: #333;
-        }
-        .delete-confirm-btn.cancel:hover {
-            background: #e2e6ea;
-        }
-        .delete-confirm-btn.delete {
-            background: linear-gradient(135deg, #ff4757 0%, #ff6b81 100%);
-            color: white;
-        }
-        .delete-confirm-btn.delete:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(255, 71, 87, 0.4);
-        }
-        .delete-confirm-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
     </style>
 </head>
 <body>
@@ -1306,46 +1119,6 @@
         </div>
     </div>
 
-    <!-- 登录模态框 -->
-    <div class="login-modal" id="loginModal">
-        <div class="login-modal-content">
-            <div class="login-modal-header">
-                <h2>🔐 登录</h2>
-                <button class="login-close-btn" onclick="closeLoginModal()">×</button>
-            </div>
-            <div class="login-modal-body">
-                <form id="loginForm" onsubmit="handleLogin(event)">
-                    <div class="login-form-group">
-                        <label>用户名</label>
-                        <input type="text" id="loginUsername" placeholder="请输入用户名" required autocomplete="username">
-                    </div>
-                    <div class="login-form-group">
-                        <label>密码</label>
-                        <input type="password" id="loginPassword" placeholder="请输入密码" required autocomplete="current-password">
-                    </div>
-                    <button type="submit" id="loginBtn" class="login-btn">登录</button>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- 删除确认模态框 -->
-    <div class="delete-confirm-modal" id="deleteConfirmModal">
-        <div class="delete-confirm-content">
-            <div class="delete-confirm-header">
-                <h2>⚠️ 确认删除</h2>
-            </div>
-            <div class="delete-confirm-body">
-                <p>确定要删除以下收藏吗？此操作无法撤销。</p>
-                <div id="deleteConfirmTitle" style="background: #f1f2f6; padding: 15px; border-radius: 8px; margin-bottom: 20px; color: #333; font-weight: 600; font-size: 15px; word-break: break-all;"></div>
-                <div class="delete-confirm-buttons">
-                    <button class="delete-confirm-btn cancel" onclick="closeDeleteConfirmModal()">取消</button>
-                    <button class="delete-confirm-btn delete" id="confirmDeleteBtn" onclick="confirmDelete()">删除</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <script>
         // Toast 消息系统
         function showToast(type, title, message, duration = 3000) {
@@ -1397,146 +1170,6 @@
         function toastInfo(title, message) {
             return showToast('info', title, message);
         }
-        
-        // 登录模态框功能
-        function openLoginModal() {
-            document.getElementById('loginModal').classList.add('active');
-            document.getElementById('loginUsername').focus();
-        }
-        
-        function closeLoginModal() {
-            document.getElementById('loginModal').classList.remove('active');
-            document.getElementById('loginForm').reset();
-        }
-        
-        async function handleLogin(event) {
-            event.preventDefault();
-            
-            const username = document.getElementById('loginUsername').value.trim();
-            const password = document.getElementById('loginPassword').value;
-            const loginBtn = document.getElementById('loginBtn');
-            
-            if (!username || !password) {
-                toastWarning('提示', '请输入用户名和密码');
-                return;
-            }
-            
-            loginBtn.disabled = true;
-            loginBtn.textContent = '登录中...';
-            
-            try {
-                const response = await fetch(`${API_BASE}/api/auth/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                });
-                
-                const data = await response.json();
-                
-                if (response.ok) {
-                    // 保存token
-                    localStorage.setItem('token', data.token);
-                    toastSuccess('成功', '登录成功！');
-                    closeLoginModal();
-                    // 如果侧边栏是打开的，重新加载收藏
-                    if (document.getElementById('favoritesSidebar').classList.contains('active')) {
-                        loadFavorites();
-                    }
-                } else {
-                    toastError('失败', data.error || '登录失败');
-                }
-            } catch (e) {
-                console.error('登录失败:', e);
-                toastError('失败', '登录失败，请检查网络连接');
-            } finally {
-                loginBtn.disabled = false;
-                loginBtn.textContent = '登录';
-            }
-        }
-        
-        // 点击模态框外部关闭
-        document.getElementById('loginModal').addEventListener('click', (e) => {
-            if (e.target.id === 'loginModal') {
-                closeLoginModal();
-            }
-        });
-        
-        // 删除确认相关变量和函数
-        let deleteTargetVodId = null;
-        let deleteTargetElement = null;
-        
-        function openDeleteConfirmModal(vodId, title, element) {
-            deleteTargetVodId = vodId;
-            deleteTargetElement = element;
-            document.getElementById('deleteConfirmTitle').textContent = title;
-            document.getElementById('deleteConfirmModal').classList.add('active');
-        }
-        
-        function closeDeleteConfirmModal() {
-            document.getElementById('deleteConfirmModal').classList.remove('active');
-            deleteTargetVodId = null;
-            deleteTargetElement = null;
-        }
-        
-        async function confirmDelete() {
-            if (!deleteTargetVodId || !deleteTargetElement) {
-                return;
-            }
-            
-            const confirmBtn = document.getElementById('confirmDeleteBtn');
-            confirmBtn.disabled = true;
-            confirmBtn.textContent = '删除中...';
-            
-            try {
-                const response = await authFetch(`${API_BASE}/api/favorites/${deleteTargetVodId}`, {
-                    method: 'DELETE'
-                });
-                
-                if (response.ok) {
-                    // 移除收藏项
-                    const item = deleteTargetElement.closest('.favorite-item');
-                    item.style.opacity = '0';
-                    item.style.transform = 'translateX(100%)';
-                    setTimeout(() => {
-                        item.remove();
-                        // 检查是否还有收藏
-                        const remaining = document.querySelectorAll('.favorite-item').length;
-                        if (remaining === 0) {
-                            document.getElementById('favoritesContent').innerHTML = `
-                                <div class="empty-favorites">
-                                    <div class="icon">💔</div>
-                                    <p>暂无收藏</p>
-                                    <p style="font-size: 13px; margin-top: 8px;">快去搜索并收藏喜欢的内容吧！</p>
-                                </div>
-                            `;
-                        }
-                    }, 300);
-                    
-                    toastSuccess('成功', '已取消收藏');
-                    closeDeleteConfirmModal();
-                } else if (response.status === 401) {
-                    const data = await response.json();
-                    toastWarning('提示', data.error || '请先登录后再操作');
-                    closeDeleteConfirmModal();
-                    openLoginModal();
-                } else {
-                    toastError('失败', '删除失败');
-                }
-            } catch (e) {
-                console.error('删除收藏失败:', e);
-                toastError('失败', '删除失败，请稍后重试');
-            } finally {
-                confirmBtn.disabled = false;
-                confirmBtn.textContent = '删除';
-            }
-        }
-        
-        // 点击删除确认框外部关闭
-        document.getElementById('deleteConfirmModal').addEventListener('click', (e) => {
-            if (e.target.id === 'deleteConfirmModal') {
-                closeDeleteConfirmModal();
-            }
-        });
         
         let allResults = [];
         let currentView = 'grid';
@@ -2214,7 +1847,6 @@
                     } else if (response.status === 401) {
                         const data = await response.json();
                         toastWarning('提示', data.error || '请先登录后再操作');
-                        openLoginModal();
                     } else {
                         const data = await response.json();
                         toastError('失败', data.error || '操作失败');
@@ -2257,7 +1889,6 @@
                     } else if (response.status === 401) {
                         const data = await response.json();
                         toastWarning('提示', data.error || '请先登录后再收藏');
-                        openLoginModal();
                     } else {
                         const data = await response.json();
                         toastError('失败', data.error || '收藏失败');
@@ -2279,11 +1910,7 @@
         }
         
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                closeModal();
-                closeLoginModal();
-                closeDeleteConfirmModal();
-            }
+            if (e.key === 'Escape') closeModal();
         });
 
         // 设置菜单功能
@@ -2361,7 +1988,6 @@
                             <div class="empty-favorites">
                                 <div class="icon">🔐</div>
                                 <p>请先登录后查看收藏</p>
-                                <button onclick="openLoginModal()" style="margin-top: 16px; padding: 10px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s;">登录</button>
                             </div>
                         `;
                         return;
@@ -2408,7 +2034,7 @@
                                 ${item.source_name ? `<span class="favorite-item-tag" style="background: #2ed573;">${item.source_name}</span>` : ''}
                             </div>
                             <div class="favorite-item-actions">
-                                <button class="favorite-item-delete" onclick="event.stopPropagation(); deleteFavorite('${item.vod_id}', '${(item.vod_name || '未知标题').replace(/'/g, "\\'")}', this)">
+                                <button class="favorite-item-delete" onclick="event.stopPropagation(); deleteFavorite('${item.vod_id}', this)">
                                     删除
                                 </button>
                             </div>
@@ -2523,8 +2149,43 @@
         }
 
         // 删除收藏
-        function deleteFavorite(vodId, title, btn) {
-            openDeleteConfirmModal(vodId, title, btn);
+        async function deleteFavorite(vodId, btn) {
+            if (!confirm('确定要删除这个收藏吗？')) return;
+            
+            try {
+                const response = await authFetch(`${API_BASE}/api/favorites/${vodId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    // 不从服务器刷新列表，只从本地移除
+                    const item = btn.closest('.favorite-item');
+                    item.style.opacity = '0';
+                    item.style.transform = 'translateX(100%)';
+                    setTimeout(() => {
+                        item.remove();
+                        // 检查是否还有收藏
+                        const remaining = document.querySelectorAll('.favorite-item').length;
+                        if (remaining === 0) {
+                            document.getElementById('favoritesContent').innerHTML = `
+                                <div class="empty-favorites">
+                                    <div class="icon">💔</div>
+                                    <p>暂无收藏</p>
+                                    <p style="font-size: 13px; margin-top: 8px;">快去搜索并收藏喜欢的内容吧！</p>
+                                </div>
+                            `;
+                        }
+                    }, 300);
+                } else if (response.status === 401) {
+                    const data = await response.json();
+                    toastWarning('提示', data.error || '请先登录后再操作');
+                } else {
+                    toastError('失败', '删除失败');
+                }
+            } catch (e) {
+                console.error('删除收藏失败:', e);
+                toastError('失败', '删除失败，请稍后重试');
+            }
         }
         
         // 页面初始化

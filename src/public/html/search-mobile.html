@@ -2,8 +2,8 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>影视搜索</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>影视搜索 - 移动版</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         * {
@@ -11,233 +11,66 @@
             padding: 0;
             box-sizing: border-box;
         }
-        body {
+        html, body {
+            height: 100%;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            background-attachment: fixed;
         }
         .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            position: relative;
+            min-height: 100vh;
+            padding: 15px;
+            padding-bottom: 100px;
         }
         .header {
             text-align: center;
             color: white;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
+            padding-top: 20px;
         }
         .header h1 {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
+            font-size: 1.8rem;
+            margin-bottom: 8px;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
         }
-        /* 侧边栏 */
-        .sidebar-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.5);
-            z-index: 1499;
-            display: none;
-        }
-        .sidebar-overlay.active {
-            display: block;
-        }
-        .sidebar {
-            position: fixed;
-            top: 0;
-            right: -400px;
-            width: 400px;
-            height: 100vh;
-            background: white;
-            box-shadow: -5px 0 20px rgba(0,0,0,0.2);
-            z-index: 1500;
-            transition: right 0.3s ease;
-            display: flex;
-            flex-direction: column;
-        }
-        .sidebar.active {
-            right: 0;
-        }
-        .sidebar-header {
-            padding: 20px;
-            border-bottom: 1px solid #eee;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .sidebar-header h2 {
-            font-size: 1.3rem;
-            color: #333;
-        }
-        .sidebar-close {
-            background: none;
-            border: none;
-            font-size: 28px;
-            cursor: pointer;
-            color: #666;
-            padding: 5px;
-            transition: color 0.2s;
-        }
-        .sidebar-close:hover {
-            color: #333;
-        }
-        .sidebar-content {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-            scrollbar-width: thin;
-            scrollbar-color: #ccc #f1f1f1;
-        }
-        .sidebar-content::-webkit-scrollbar {
-            width: 6px;
-        }
-        .sidebar-content::-webkit-scrollbar-track {
-            background: #f1f1f1;
-        }
-        .sidebar-content::-webkit-scrollbar-thumb {
-            background: #ccc;
-            border-radius: 3px;
-        }
-        .sidebar-content::-webkit-scrollbar-thumb:hover {
-            background: #999;
-        }
-        .favorite-item {
-            display: flex;
-            gap: 15px;
-            padding: 15px;
-            border-radius: 12px;
-            background: #f8f9fa;
-            margin-bottom: 12px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .favorite-item:hover {
-            background: #e9ecef;
-            transform: translateX(-3px);
-        }
-        .favorite-item-img {
-            width: 80px;
-            height: 110px;
-            object-fit: cover;
-            border-radius: 8px;
-            background: #ddd;
-            flex-shrink: 0;
-        }
-        .favorite-item-info {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            min-width: 0;
-        }
-        .favorite-item-title {
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 8px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        .favorite-item-meta {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-bottom: 8px;
-        }
-        .favorite-item-tag {
-            font-size: 12px;
-            padding: 3px 8px;
-            background: #667eea;
-            color: white;
-            border-radius: 4px;
-        }
-        .favorite-item-actions {
-            display: flex;
-            gap: 8px;
-        }
-        .favorite-item-delete {
-            background: #ff4757;
-            color: white;
-            border: none;
-            padding: 5px 12px;
-            border-radius: 6px;
-            font-size: 12px;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        .favorite-item-delete:hover {
-            background: #ff3838;
-        }
-        .empty-favorites {
-            text-align: center;
-            padding: 60px 20px;
-            color: #999;
-        }
-        .empty-favorites .icon {
-            font-size: 60px;
-            margin-bottom: 15px;
-        }
-        /* 加载更多 */
-        .load-more {
-            text-align: center;
-            padding: 20px;
-            color: #999;
+        .header p {
             font-size: 14px;
-        }
-        .load-more.spinner {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-        .load-more-spinner {
-            width: 20px;
-            height: 20px;
-            border: 2px solid #f3f3f3;
-            border-top: 2px solid #667eea;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            opacity: 0.9;
         }
         .search-box {
             display: flex;
             gap: 10px;
-            max-width: 600px;
-            margin: 0 auto;
-            background: white;
-            padding: 15px;
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 12px;
+            border-radius: 16px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+            backdrop-filter: blur(20px);
+            margin-bottom: 15px;
         }
         .search-box input {
             flex: 1;
-            padding: 12px 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
+            padding: 14px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
             font-size: 16px;
             outline: none;
-            transition: border-color 0.3s;
+            transition: all 0.3s;
         }
         .search-box input:focus {
             border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
         }
         .search-box button {
-            padding: 12px 30px;
+            padding: 14px 24px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            border-radius: 8px;
+            border-radius: 12px;
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: all 0.3s;
+            min-width: 80px;
         }
         .search-box button:hover {
             transform: translateY(-2px);
@@ -248,223 +81,26 @@
             cursor: not-allowed;
             transform: none;
         }
-        .search-box.sticky {
-            position: fixed;
-            top: 15px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1000;
-            max-width: 700px;
-            width: calc(100% - 40px);
-            padding: 12px 18px;
-            backdrop-filter: blur(20px);
-            background: rgba(255, 255, 255, 0.95);
-            box-shadow: 0 8px 32px rgba(102, 126, 234, 0.25), 0 2px 8px rgba(0, 0, 0, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.5);
-            animation: slideDown 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .search-box.sticky input {
-            padding: 10px 14px;
-            font-size: 15px;
-        }
-        .search-box.sticky button {
-            padding: 10px 24px;
-            font-size: 15px;
-        }
-        @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateX(-50%) translateY(-30px) scale(0.95);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(-50%) translateY(0) scale(1);
-            }
-        }
         .stats {
             text-align: center;
             color: white;
-            margin: 20px 0;
+            margin: 15px 0;
             font-size: 14px;
-        }
-        .settings-panel {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            z-index: 3001;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            align-items: flex-start;
-        }
-        .log-panel {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 3001;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            align-items: flex-end;
-        }
-        .log-toggle-btn {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            border: none;
-            cursor: pointer;
-            font-size: 24px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s;
-            position: relative;
-        }
-        .log-toggle-btn:hover {
-            transform: scale(1.1);
-            box-shadow: 0 6px 20px rgba(0,0,0,0.4);
-        }
-        .log-toggle-btn.has-new {
-            animation: pulse 1.5s infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-        }
-        .log-badge {
-            position: absolute;
-            top: -5px;
-            right: -5px;
-            background: #ff4757;
-            color: white;
-            font-size: 12px;
-            font-weight: bold;
-            width: 22px;
-            height: 22px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .settings-btn {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.2);
-            backdrop-filter: blur(10px);
-            color: white;
-            border: 2px solid rgba(255,255,255,0.3);
-            cursor: pointer;
-            font-size: 24px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s;
-        }
-        .settings-btn:hover {
-            background: rgba(255,255,255,0.3);
-            transform: rotate(90deg);
-        }
-        /* 设置菜单 */
-        .settings-menu {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-            min-width: 180px;
-            display: none;
-            overflow: hidden;
-            animation: slideIn 0.2s ease-out;
-        }
-        .settings-menu.active {
-            display: block;
-        }
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        .settings-menu-item {
-            padding: 14px 20px;
-            cursor: pointer;
-            transition: background 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 15px;
-            color: #333;
-        }
-        .settings-menu-item:hover {
-            background: #f5f5f5;
-        }
-
-        .log-container {
-            background: #1a1a2e;
-            color: #eee;
-            border-radius: 12px;
-            max-height: 320px;
-            max-width: 380px;
-            font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 12px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-            display: none;
-            border: 1px solid rgba(255,255,255,0.1);
-            position: fixed;
-            top: 90px;
-            right: 20px;
-            z-index: 3000;
-            overflow: hidden;
-        }
-        .log-header {
-            padding: 10px 15px 8px;
-            border-bottom: 1px solid #333;
-            background: #1a1a2e;
-            position: sticky;
-            top: 0;
-            z-index: 1;
-        }
-        .log-content {
-            padding: 5px 15px 10px;
-            max-height: 260px;
-            overflow-y: auto;
-        }
-        .log-container.active {
-            display: block;
-        }
-        .log-item {
-            padding: 5px 0;
-            border-bottom: 1px solid #333;
-        }
-        .log-item:last-child {
-            border-bottom: none;
-        }
-        .log-success {
-            color: #4ade80;
-        }
-        .log-error {
-            color: #f87171;
         }
         .view-toggle {
             display: flex;
             justify-content: center;
             gap: 10px;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
         .view-toggle button {
-            padding: 8px 20px;
+            padding: 10px 20px;
             background: rgba(255,255,255,0.2);
             color: white;
             border: 1px solid rgba(255,255,255,0.3);
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
+            font-size: 14px;
             transition: all 0.3s;
         }
         .view-toggle button.active {
@@ -474,40 +110,40 @@
         }
         .grid-view {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 15px;
         }
         .card {
             background: white;
-            border-radius: 12px;
+            border-radius: 16px;
             overflow: hidden;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            transition: transform 0.3s, box-shadow 0.3s;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+            transition: all 0.3s;
             cursor: pointer;
         }
         .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+            transform: translateY(-4px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.18);
         }
         .card-image {
             width: 100%;
-            height: 300px;
+            height: 200px;
             object-fit: cover;
             background: #f0f0f0;
             display: flex;
             align-items: center;
             justify-content: center;
             color: #999;
-            font-size: 48px;
+            font-size: 36px;
         }
         .card-content {
-            padding: 15px;
+            padding: 12px;
         }
         .card-title {
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 600;
             color: #333;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -516,73 +152,66 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
         .card-year {
             color: #666;
-            font-size: 14px;
+            font-size: 12px;
         }
         .card-source {
             background: #667eea;
             color: white;
-            padding: 3px 10px;
+            padding: 2px 8px;
             border-radius: 4px;
-            font-size: 12px;
+            font-size: 11px;
         }
         .card-type {
             display: inline-block;
             background: #e0e7ff;
             color: #667eea;
-            padding: 4px 10px;
+            padding: 3px 8px;
             border-radius: 4px;
-            font-size: 12px;
-            margin-bottom: 8px;
-        }
-        .card-desc {
-            font-size: 13px;
-            color: #888;
-            line-height: 1.5;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
+            font-size: 11px;
+            margin-bottom: 6px;
         }
         .table-view {
             background: white;
-            border-radius: 12px;
+            border-radius: 16px;
             overflow: hidden;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.12);
         }
         .table {
             width: 100%;
             border-collapse: collapse;
         }
         .table th, .table td {
-            padding: 15px;
+            padding: 12px 10px;
             text-align: left;
             border-bottom: 1px solid #f0f0f0;
+            font-size: 13px;
         }
         .table th {
             background: #f8f9fa;
             font-weight: 600;
             color: #333;
+            font-size: 12px;
         }
         .table tbody tr:hover {
             background: #f8f9fa;
             cursor: pointer;
         }
         .thumbnail {
-            width: 60px;
-            height: 80px;
+            width: 50px;
+            height: 70px;
             object-fit: cover;
             border-radius: 4px;
             background: #f0f0f0;
         }
         .tag {
             display: inline-block;
-            padding: 3px 10px;
+            padding: 2px 8px;
             border-radius: 4px;
-            font-size: 12px;
+            font-size: 11px;
         }
         .tag-source {
             background: #e0e7ff;
@@ -595,19 +224,22 @@
         .pagination {
             display: flex;
             justify-content: center;
-            gap: 8px;
-            margin-top: 20px;
+            gap: 6px;
+            margin-top: 15px;
             padding: 15px;
             background: white;
-            border-radius: 8px;
+            border-radius: 12px;
+            flex-wrap: wrap;
         }
         .pagination button {
-            padding: 8px 16px;
+            padding: 10px 16px;
             border: 1px solid #e0e0e0;
             background: white;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
+            font-size: 14px;
             transition: all 0.2s;
+            min-width: 45px;
         }
         .pagination button:hover:not(:disabled) {
             background: #667eea;
@@ -630,10 +262,10 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.7);
+            background: rgba(0,0,0,0.8);
             z-index: 2000;
             overflow-y: auto;
-            padding: 20px;
+            padding: 15px;
         }
         .modal.active {
             display: flex;
@@ -642,11 +274,11 @@
         }
         .modal-content {
             background: white;
-            border-radius: 16px;
-            max-width: 900px;
+            border-radius: 20px;
             width: 100%;
-            margin-top: 30px;
-            margin-bottom: 30px;
+            max-width: 90%;
+            margin-top: 20px;
+            margin-bottom: 20px;
             overflow: hidden;
             animation: slideUp 0.3s ease;
         }
@@ -667,18 +299,22 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 1;
         }
         .modal-header h2 {
             margin: 0;
+            font-size: 18px;
         }
         .modal-close {
             background: rgba(255,255,255,0.2);
             border: none;
             color: white;
-            font-size: 28px;
+            font-size: 24px;
             cursor: pointer;
-            width: 40px;
-            height: 40px;
+            width: 36px;
+            height: 36px;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -689,54 +325,61 @@
             background: rgba(255,255,255,0.3);
         }
         .modal-body {
-            padding: 25px;
+            padding: 20px;
         }
         .movie-info {
-            display: flex;
-            gap: 30px;
-            margin-bottom: 25px;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 20px;
         }
         .movie-poster {
-            width: 200px;
-            height: 280px;
+            width: 100%;
+            height: auto;
+            max-height: 350px;
             object-fit: cover;
             border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            flex-shrink: 0;
         }
         .movie-details {
             flex: 1;
         }
         .movie-details h3 {
             color: #333;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
+            font-size: 20px;
         }
         .detail-row {
             display: flex;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
+            font-size: 14px;
         }
         .detail-label {
-            width: 80px;
+            width: 70px;
             color: #888;
             font-weight: 500;
+            flex-shrink: 0;
         }
         .detail-value {
             color: #333;
+            flex: 1;
+            word-break: break-all;
         }
         .movie-desc {
             background: #f8f9fa;
-            padding: 20px;
+            padding: 15px;
             border-radius: 10px;
-            margin-bottom: 25px;
-            line-height: 1.8;
+            margin-bottom: 20px;
+            line-height: 1.6;
             color: #555;
+            font-size: 14px;
         }
         .episodes {
-            margin-top: 25px;
+            margin-top: 20px;
         }
         .episodes h4 {
-            margin-bottom: 15px;
+            margin-bottom: 12px;
             color: #333;
+            font-size: 16px;
         }
         .episode-grid {
             display: flex;
@@ -744,11 +387,12 @@
             gap: 8px;
         }
         .episode-btn {
-            padding: 8px 16px;
+            padding: 10px 16px;
             background: #f0f0f0;
             border: 1px solid #e0e0e0;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
+            font-size: 14px;
             transition: all 0.2s;
         }
         .episode-btn:hover {
@@ -757,11 +401,11 @@
             border-color: #667eea;
         }
         .favorite-btn {
-            padding: 10px 25px;
+            padding: 12px 25px;
             background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
             color: white;
             border: none;
-            border-radius: 8px;
+            border-radius: 10px;
             font-size: 15px;
             font-weight: 600;
             cursor: pointer;
@@ -770,6 +414,8 @@
             align-items: center;
             gap: 8px;
             margin-top: 15px;
+            width: 100%;
+            justify-content: center;
         }
         .favorite-btn:hover {
             transform: translateY(-2px);
@@ -778,16 +424,12 @@
         .favorite-btn.favorited {
             background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
         }
-        .favorite-btn.favorited:hover {
-            box-shadow: 0 4px 15px rgba(17, 153, 142, 0.4);
-        }
         .player-container {
             background: #000;
-            border-radius: 8px;
+            border-radius: 12px;
             overflow: hidden;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             display: none;
-            max-height: 600px;  // 固定容器最大高度
             width: 100%;
         }
         .player-container.active {
@@ -795,16 +437,15 @@
         }
         .player-container video {
             width: 100%;
-            height: 100%;
-            max-height: 600px;
+            height: 220px;
             display: block;
             background: #000;
-            object-fit: contain;  // 保持视频比例，完整显示在容器内
-            object-position: center;  // 视频居中显示
+            object-fit: contain;
+            object-position: center;
         }
         .player-loading {
             position: relative;
-            height: 500px;  // 给加载状态一个固定高度
+            height: 220px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -812,10 +453,10 @@
         .player-loading::before {
             content: '正在加载视频...';
             color: white;
-            font-size: 18px;
+            font-size: 16px;
             z-index: 10;
             background: rgba(0,0,0,0.7);
-            padding: 15px 30px;
+            padding: 12px 24px;
             border-radius: 8px;
             animation: pulse 1.5s ease-in-out infinite;
         }
@@ -825,217 +466,283 @@
         }
         .empty-state {
             text-align: center;
-            padding: 60px 20px;
+            padding: 50px 20px;
             color: white;
         }
         .empty-state h3 {
             margin-bottom: 10px;
+            font-size: 18px;
         }
-        @media (max-width: 768px) {
-            .movie-info {
-                flex-direction: column;
-            }
-            .movie-poster {
-                width: 100%;
-                height: auto;
-                max-height: 400px;
-            }
-            .search-box {
-                flex-direction: column;
-            }
-            .grid-view {
-                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            }
+        .empty-state p {
+            font-size: 14px;
         }
-        
-        /* Toast 消息样式 */
+        .load-more {
+            text-align: center;
+            padding: 15px;
+            color: #999;
+            font-size: 13px;
+        }
+        .load-more.spinner {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .load-more-spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
         .toast-container {
             position: fixed;
             top: 20px;
-            right: 20px;
+            right: 15px;
             z-index: 9999;
             display: flex;
             flex-direction: column;
             gap: 10px;
             pointer-events: none;
         }
-        
         .toast {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 16px 20px;
-            border-radius: 12px;
+            gap: 10px;
+            padding: 14px 16px;
+            border-radius: 10px;
             background: white;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
             pointer-events: auto;
             animation: toastSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            min-width: 280px;
-            max-width: 400px;
+            min-width: 240px;
+            max-width: 320px;
         }
-        
         .toast.toast-success {
             border-left: 4px solid #10b981;
         }
-        
         .toast.toast-error {
             border-left: 4px solid #ef4444;
         }
-        
         .toast.toast-warning {
             border-left: 4px solid #f59e0b;
         }
-        
-        .toast.toast-info {
-            border-left: 4px solid #3b82f6;
-        }
-        
         .toast-icon {
-            font-size: 24px;
+            font-size: 20px;
             flex-shrink: 0;
         }
-        
         .toast-content {
             flex: 1;
         }
-        
         .toast-title {
             font-weight: 600;
             color: #1f2937;
             margin-bottom: 2px;
-            font-size: 14px;
+            font-size: 13px;
         }
-        
         .toast-message {
             color: #6b7280;
-            font-size: 13px;
-            line-height: 1.5;
+            font-size: 12px;
+            line-height: 1.4;
         }
-        
         .toast-close {
             background: none;
             border: none;
             color: #9ca3af;
             cursor: pointer;
-            font-size: 18px;
+            font-size: 16px;
             padding: 0;
             line-height: 1;
-            transition: color 0.2s;
         }
-        
-        .toast-close:hover {
-            color: #4b5563;
-        }
-        
         .toast.hiding {
             animation: toastSlideOut 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
         }
-        
         @keyframes toastSlideIn {
-            from {
-                opacity: 0;
-                transform: translateX(100px) scale(0.95);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0) scale(1);
-            }
+            from { opacity: 0; transform: translateX(100px) scale(0.95); }
+            to { opacity: 1; transform: translateX(0) scale(1); }
         }
-        
         @keyframes toastSlideOut {
-            from {
-                opacity: 1;
-                transform: translateX(0) scale(1);
-            }
-            to {
-                opacity: 0;
-                transform: translateX(100px) scale(0.95);
-            }
+            from { opacity: 1; transform: translateX(0) scale(1); }
+            to { opacity: 0; transform: translateX(100px) scale(0.95); }
         }
-        
-        /* 进一步美化界面 */
-        body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
-            background-attachment: fixed;
-        }
-        
-        .header h1 {
-            font-size: 3rem;
-            font-weight: 700;
-            text-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-            letter-spacing: -1px;
-        }
-        
-        .search-box {
-            backdrop-filter: blur(20px);
+        .bottom-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
             background: rgba(255, 255, 255, 0.95);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-        }
-        
-        .search-box input {
-            border: 2px solid #e5e7eb;
-            transition: all 0.3s;
-            font-weight: 500;
-        }
-        
-        .search-box input:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
-        }
-        
-        .search-box button {
-            font-weight: 600;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-            transition: all 0.3s;
-        }
-        
-        .search-box button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
-        }
-        
-        .card {
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        
-        .card:hover {
-            transform: translateY(-8px) scale(1.02);
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
-        }
-        
-        .card-image {
-            border-radius: 16px 16px 0 0;
-        }
-        
-        .modal-content {
-            border-radius: 20px;
-            overflow: hidden;
-            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.3);
-        }
-        
-        .modal-header {
-            padding: 24px;
-        }
-        
-        .modal-body {
-            padding: 32px;
-        }
-        
-        .settings-btn, .log-toggle-btn {
             backdrop-filter: blur(20px);
-            border: 2px solid rgba(255, 255, 255, 0.4);
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            padding: 12px 15px;
+            display: flex;
+            justify-content: space-around;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+            z-index: 1000;
         }
-        
-        .settings-btn:hover, .log-toggle-btn:hover {
-            transform: scale(1.1);
-            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+        .bottom-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 8px 20px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            color: #666;
+            transition: color 0.2s;
+            font-size: 12px;
         }
-        
-        /* 登录模态框样式 */
+        .bottom-btn:hover, .bottom-btn.active {
+            color: #667eea;
+        }
+        .bottom-btn span:first-child {
+            font-size: 20px;
+        }
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1499;
+            display: none;
+        }
+        .sidebar-overlay.active {
+            display: block;
+        }
+        .sidebar {
+            position: fixed;
+            top: 0;
+            right: -100%;
+            width: 85%;
+            max-width: 320px;
+            height: 100vh;
+            background: white;
+            box-shadow: -5px 0 20px rgba(0,0,0,0.2);
+            z-index: 1500;
+            transition: right 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar.active {
+            right: 0;
+        }
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .sidebar-header h2 {
+            font-size: 1.2rem;
+            color: #333;
+        }
+        .sidebar-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+            padding: 5px;
+        }
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+        .favorite-item {
+            display: flex;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 10px;
+            background: #f8f9fa;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .favorite-item:hover {
+            background: #e9ecef;
+        }
+        .favorite-item-img {
+            width: 65px;
+            height: 90px;
+            object-fit: cover;
+            border-radius: 6px;
+            background: #ddd;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+        .favorite-item-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-width: 0;
+        }
+        .favorite-item-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 6px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 14px;
+        }
+        .favorite-item-meta {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 6px;
+        }
+        .favorite-item-tag {
+            font-size: 11px;
+            padding: 2px 6px;
+            background: #667eea;
+            color: white;
+            border-radius: 3px;
+        }
+        .favorite-item-actions {
+            display: flex;
+            gap: 6px;
+        }
+        .favorite-item-delete {
+            background: #ff4757;
+            color: white;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .empty-favorites {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+        .empty-favorites .icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+        .empty-favorites button {
+            margin-top: 12px;
+            padding: 10px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
         .login-modal {
             display: none;
             position: fixed;
@@ -1046,7 +753,7 @@
             background: rgba(0,0,0,0.7);
             z-index: 3000;
             overflow-y: auto;
-            padding: 20px;
+            padding: 15px;
         }
         .login-modal.active {
             display: flex;
@@ -1056,40 +763,57 @@
         .login-modal-content {
             background: white;
             border-radius: 20px;
-            max-width: 400px;
             width: 100%;
+            max-width: 340px;
             overflow: hidden;
-            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.3);
-            animation: slideUp 0.3s ease;
+            box-shadow: 0 25px 80px rgba(0,0,0,0.3);
         }
         .login-modal-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 25px;
+            padding: 20px;
             text-align: center;
+            position: relative;
         }
         .login-modal-header h2 {
             margin: 0;
+            font-size: 20px;
+        }
+        .login-close-btn {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
             font-size: 24px;
+            cursor: pointer;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .login-modal-body {
-            padding: 30px;
+            padding: 25px;
         }
         .login-form-group {
-            margin-bottom: 20px;
+            margin-bottom: 18px;
         }
         .login-form-group label {
             display: block;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             color: #333;
             font-weight: 500;
+            font-size: 14px;
         }
         .login-form-group input {
             width: 100%;
-            padding: 12px 16px;
+            padding: 12px 14px;
             border: 2px solid #e5e7eb;
             border-radius: 10px;
-            font-size: 16px;
+            font-size: 15px;
             box-sizing: border-box;
             transition: all 0.3s;
         }
@@ -1119,28 +843,6 @@
             cursor: not-allowed;
             transform: none;
         }
-        .login-close-btn {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            background: rgba(255,255,255,0.2);
-            border: none;
-            color: white;
-            font-size: 28px;
-            cursor: pointer;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background 0.2s;
-        }
-        .login-close-btn:hover {
-            background: rgba(255,255,255,0.3);
-        }
-        
-        /* 删除确认模态框样式 */
         .delete-confirm-modal {
             display: none;
             position: fixed;
@@ -1150,8 +852,7 @@
             height: 100%;
             background: rgba(0,0,0,0.7);
             z-index: 3001;
-            overflow-y: auto;
-            padding: 20px;
+            padding: 15px;
         }
         .delete-confirm-modal.active {
             display: flex;
@@ -1160,43 +861,51 @@
         }
         .delete-confirm-content {
             background: white;
-            border-radius: 20px;
-            max-width: 350px;
+            border-radius: 16px;
             width: 100%;
+            max-width: 320px;
             overflow: hidden;
-            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.3);
-            animation: slideUp 0.3s ease;
         }
         .delete-confirm-header {
             background: linear-gradient(135deg, #ff4757 0%, #ff6b81 100%);
             color: white;
-            padding: 25px;
+            padding: 20px;
             text-align: center;
         }
         .delete-confirm-header h2 {
             margin: 0;
-            font-size: 20px;
+            font-size: 18px;
         }
         .delete-confirm-body {
-            padding: 30px;
+            padding: 25px;
             text-align: center;
         }
         .delete-confirm-body p {
-            margin: 0 0 25px 0;
+            margin: 0 0 20px 0;
             color: #666;
-            font-size: 15px;
-            line-height: 1.6;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        #deleteConfirmTitle {
+            background: #f1f2f6;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+            word-break: break-all;
         }
         .delete-confirm-buttons {
             display: flex;
-            gap: 12px;
+            gap: 10px;
         }
         .delete-confirm-btn {
             flex: 1;
             padding: 12px;
             border: none;
             border-radius: 10px;
-            font-size: 15px;
+            font-size: 14px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
@@ -1205,21 +914,70 @@
             background: #f1f2f6;
             color: #333;
         }
-        .delete-confirm-btn.cancel:hover {
-            background: #e2e6ea;
-        }
         .delete-confirm-btn.delete {
             background: linear-gradient(135deg, #ff4757 0%, #ff6b81 100%);
             color: white;
         }
-        .delete-confirm-btn.delete:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(255, 71, 87, 0.4);
-        }
         .delete-confirm-btn:disabled {
             opacity: 0.6;
             cursor: not-allowed;
-            transform: none;
+        }
+        .log-container {
+            position: fixed;
+            bottom: 80px;
+            left: 15px;
+            right: 15px;
+            background: rgba(26, 26, 46, 0.95);
+            color: #eee;
+            border-radius: 12px;
+            max-height: 200px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            display: none;
+            border: 1px solid rgba(255,255,255,0.1);
+            z-index: 3000;
+            overflow: hidden;
+        }
+        .log-container.active {
+            display: block;
+        }
+        .log-header {
+            padding: 10px 12px;
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #1a1a2e;
+        }
+        .log-header span {
+            font-weight: bold;
+            font-size: 13px;
+        }
+        .log-header button {
+            background: none;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            font-size: 18px;
+            padding: 0 5px;
+        }
+        .log-content {
+            padding: 8px 12px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        .log-item {
+            padding: 4px 0;
+            border-bottom: 1px solid #333;
+        }
+        .log-item:last-child {
+            border-bottom: none;
+        }
+        .log-success {
+            color: #4ade80;
+        }
+        .log-error {
+            color: #f87171;
         }
     </style>
 </head>
@@ -1239,41 +997,29 @@
             <span id="statsText"></span>
         </div>
 
-        <!-- 左侧设置面板 -->
-        <div class="settings-panel">
-            <button class="settings-btn" onclick="toggleSettingsMenu()">⚙️</button>
-            <div class="settings-menu" id="settingsMenu">
-                <div class="settings-menu-item" onclick="openFavorites(); toggleSettingsMenu();">
-                    ❤️ 我的收藏
-                </div>
-            </div>
-        </div>
-        
-        <!-- 右侧日志面板 -->
-        <div class="log-panel">
-            <button class="log-toggle-btn" id="logToggleBtn" onclick="toggleLogPanel()">
-                📋
-                <span class="log-badge" id="logBadge" style="display: none;">0</span>
-            </button>
-        </div>
-        
-        <!-- 日志面板 -->
-        <div class="log-container" id="logContainer">
-            <div class="log-header" style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-weight: bold;">🔍 搜索日志</span>
-                <button onclick="closeLog()" style="background: none; border: none; color: #888; cursor: pointer; font-size: 18px; padding: 0 5px;">×</button>
-            </div>
-            <div class="log-content" id="logContent"></div>
-        </div>
-
         <div class="view-toggle" id="viewToggle" style="display: none;">
-            <button class="active" onclick="setView('grid')">📱 卡片视图</button>
-            <button onclick="setView('table')">📋 列表视图</button>
+            <button class="active" onclick="setView('grid')">📱 卡片</button>
+            <button onclick="setView('table')">📋 列表</button>
         </div>
 
         <div id="resultsGrid" class="grid-view" style="display: none;"></div>
         <div id="resultsTable" style="display: none;"></div>
         <div id="pagination" class="pagination" style="display: none;"></div>
+    </div>
+
+    <div class="bottom-bar">
+        <button class="bottom-btn" onclick="doSearch()">
+            <span>🔍</span>
+            <span>搜索</span>
+        </button>
+        <button class="bottom-btn" onclick="openFavorites()">
+            <span>❤️</span>
+            <span>收藏</span>
+        </button>
+        <button class="bottom-btn" onclick="toggleLogPanel()">
+            <span>📋</span>
+            <span>日志</span>
+        </button>
     </div>
 
     <div id="modal" class="modal">
@@ -1291,22 +1037,17 @@
         </div>
     </div>
 
-    <!-- Toast 容器 -->
     <div class="toast-container" id="toastContainer"></div>
-    
-    <!-- 收藏侧边栏 -->
-    <div class="sidebar-overlay" id="sidebarOverlay" onclick="handleSidebarOverlayClick()"></div>
+
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
     <div class="sidebar" id="favoritesSidebar">
         <div class="sidebar-header">
             <h2>❤️ 我的收藏</h2>
             <button class="sidebar-close" onclick="closeSidebar()">×</button>
         </div>
-        <div class="sidebar-content" id="favoritesContent">
-            <!-- 收藏列表将在这里显示 -->
-        </div>
+        <div class="sidebar-content" id="favoritesContent"></div>
     </div>
 
-    <!-- 登录模态框 -->
     <div class="login-modal" id="loginModal">
         <div class="login-modal-content">
             <div class="login-modal-header">
@@ -1317,11 +1058,11 @@
                 <form id="loginForm" onsubmit="handleLogin(event)">
                     <div class="login-form-group">
                         <label>用户名</label>
-                        <input type="text" id="loginUsername" placeholder="请输入用户名" required autocomplete="username">
+                        <input type="text" id="loginUsername" placeholder="请输入用户名" required>
                     </div>
                     <div class="login-form-group">
                         <label>密码</label>
-                        <input type="password" id="loginPassword" placeholder="请输入密码" required autocomplete="current-password">
+                        <input type="password" id="loginPassword" placeholder="请输入密码" required>
                     </div>
                     <button type="submit" id="loginBtn" class="login-btn">登录</button>
                 </form>
@@ -1329,7 +1070,6 @@
         </div>
     </div>
 
-    <!-- 删除确认模态框 -->
     <div class="delete-confirm-modal" id="deleteConfirmModal">
         <div class="delete-confirm-content">
             <div class="delete-confirm-header">
@@ -1337,7 +1077,7 @@
             </div>
             <div class="delete-confirm-body">
                 <p>确定要删除以下收藏吗？此操作无法撤销。</p>
-                <div id="deleteConfirmTitle" style="background: #f1f2f6; padding: 15px; border-radius: 8px; margin-bottom: 20px; color: #333; font-weight: 600; font-size: 15px; word-break: break-all;"></div>
+                <div id="deleteConfirmTitle"></div>
                 <div class="delete-confirm-buttons">
                     <button class="delete-confirm-btn cancel" onclick="closeDeleteConfirmModal()">取消</button>
                     <button class="delete-confirm-btn delete" id="confirmDeleteBtn" onclick="confirmDelete()">删除</button>
@@ -1346,20 +1086,20 @@
         </div>
     </div>
 
+    <div class="log-container" id="logContainer">
+        <div class="log-header">
+            <span>🔍 搜索日志</span>
+            <button onclick="closeLog()">×</button>
+        </div>
+        <div class="log-content" id="logContent"></div>
+    </div>
+
     <script>
-        // Toast 消息系统
         function showToast(type, title, message, duration = 3000) {
             const container = document.getElementById('toastContainer');
             const toast = document.createElement('div');
             toast.className = `toast toast-${type}`;
-            
-            const icons = {
-                success: '✅',
-                error: '❌',
-                warning: '⚠️',
-                info: 'ℹ️'
-            };
-            
+            const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
             toast.innerHTML = `
                 <span class="toast-icon">${icons[type]}</span>
                 <div class="toast-content">
@@ -1368,77 +1108,49 @@
                 </div>
                 <button class="toast-close" onclick="this.parentElement.classList.add('hiding'); setTimeout(() => this.parentElement.remove(), 300);">×</button>
             `;
-            
             container.appendChild(toast);
-            
             if (duration > 0) {
                 setTimeout(() => {
                     toast.classList.add('hiding');
                     setTimeout(() => toast.remove(), 300);
                 }, duration);
             }
-            
             return toast;
         }
-        
-        // 快捷方法
-        function toastSuccess(title, message) {
-            return showToast('success', title, message);
-        }
-        
-        function toastError(title, message) {
-            return showToast('error', title, message);
-        }
-        
-        function toastWarning(title, message) {
-            return showToast('warning', title, message);
-        }
-        
-        function toastInfo(title, message) {
-            return showToast('info', title, message);
-        }
-        
-        // 登录模态框功能
+        function toastSuccess(title, message) { return showToast('success', title, message); }
+        function toastError(title, message) { return showToast('error', title, message); }
+        function toastWarning(title, message) { return showToast('warning', title, message); }
+
         function openLoginModal() {
             document.getElementById('loginModal').classList.add('active');
             document.getElementById('loginUsername').focus();
         }
-        
         function closeLoginModal() {
             document.getElementById('loginModal').classList.remove('active');
             document.getElementById('loginForm').reset();
         }
-        
         async function handleLogin(event) {
             event.preventDefault();
-            
             const username = document.getElementById('loginUsername').value.trim();
             const password = document.getElementById('loginPassword').value;
             const loginBtn = document.getElementById('loginBtn');
-            
             if (!username || !password) {
                 toastWarning('提示', '请输入用户名和密码');
                 return;
             }
-            
             loginBtn.disabled = true;
             loginBtn.textContent = '登录中...';
-            
             try {
                 const response = await fetch(`${API_BASE}/api/auth/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password })
                 });
-                
                 const data = await response.json();
-                
                 if (response.ok) {
-                    // 保存token
                     localStorage.setItem('token', data.token);
                     toastSuccess('成功', '登录成功！');
                     closeLoginModal();
-                    // 如果侧边栏是打开的，重新加载收藏
                     if (document.getElementById('favoritesSidebar').classList.contains('active')) {
                         loadFavorites();
                     }
@@ -1446,72 +1158,52 @@
                     toastError('失败', data.error || '登录失败');
                 }
             } catch (e) {
-                console.error('登录失败:', e);
                 toastError('失败', '登录失败，请检查网络连接');
             } finally {
                 loginBtn.disabled = false;
                 loginBtn.textContent = '登录';
             }
         }
-        
-        // 点击模态框外部关闭
         document.getElementById('loginModal').addEventListener('click', (e) => {
-            if (e.target.id === 'loginModal') {
-                closeLoginModal();
-            }
+            if (e.target.id === 'loginModal') closeLoginModal();
         });
-        
-        // 删除确认相关变量和函数
+
         let deleteTargetVodId = null;
         let deleteTargetElement = null;
-        
         function openDeleteConfirmModal(vodId, title, element) {
             deleteTargetVodId = vodId;
             deleteTargetElement = element;
             document.getElementById('deleteConfirmTitle').textContent = title;
             document.getElementById('deleteConfirmModal').classList.add('active');
         }
-        
         function closeDeleteConfirmModal() {
             document.getElementById('deleteConfirmModal').classList.remove('active');
             deleteTargetVodId = null;
             deleteTargetElement = null;
         }
-        
         async function confirmDelete() {
-            if (!deleteTargetVodId || !deleteTargetElement) {
-                return;
-            }
-            
+            if (!deleteTargetVodId || !deleteTargetElement) return;
             const confirmBtn = document.getElementById('confirmDeleteBtn');
             confirmBtn.disabled = true;
             confirmBtn.textContent = '删除中...';
-            
             try {
-                const response = await authFetch(`${API_BASE}/api/favorites/${deleteTargetVodId}`, {
-                    method: 'DELETE'
-                });
-                
+                const response = await authFetch(`${API_BASE}/api/favorites/${deleteTargetVodId}`, { method: 'DELETE' });
                 if (response.ok) {
-                    // 移除收藏项
                     const item = deleteTargetElement.closest('.favorite-item');
                     item.style.opacity = '0';
-                    item.style.transform = 'translateX(100%)';
                     setTimeout(() => {
                         item.remove();
-                        // 检查是否还有收藏
                         const remaining = document.querySelectorAll('.favorite-item').length;
                         if (remaining === 0) {
                             document.getElementById('favoritesContent').innerHTML = `
                                 <div class="empty-favorites">
                                     <div class="icon">💔</div>
                                     <p>暂无收藏</p>
-                                    <p style="font-size: 13px; margin-top: 8px;">快去搜索并收藏喜欢的内容吧！</p>
+                                    <p style="font-size: 12px; margin-top: 6px;">快去搜索并收藏喜欢的内容吧！</p>
                                 </div>
                             `;
                         }
                     }, 300);
-                    
                     toastSuccess('成功', '已取消收藏');
                     closeDeleteConfirmModal();
                 } else if (response.status === 401) {
@@ -1523,26 +1215,21 @@
                     toastError('失败', '删除失败');
                 }
             } catch (e) {
-                console.error('删除收藏失败:', e);
                 toastError('失败', '删除失败，请稍后重试');
             } finally {
                 confirmBtn.disabled = false;
                 confirmBtn.textContent = '删除';
             }
         }
-        
-        // 点击删除确认框外部关闭
         document.getElementById('deleteConfirmModal').addEventListener('click', (e) => {
-            if (e.target.id === 'deleteConfirmModal') {
-                closeDeleteConfirmModal();
-            }
+            if (e.target.id === 'deleteConfirmModal') closeDeleteConfirmModal();
         });
-        
+
         let allResults = [];
         let currentView = 'grid';
-        let currentPage = 1; // 本地显示页码
-        let currentApiPage = 1; // API当前已加载的最大页码
-        let currentKeyword = ''; // 保存当前搜索关键词
+        let currentPage = 1;
+        let currentApiPage = 1;
+        let currentKeyword = '';
         const pageSize = 20;
         let eventSource = null;
         let isSearching = false;
@@ -1550,38 +1237,27 @@
         let favoritesPage = 1;
         let favoritesHasMore = true;
         let favoritesLoading = false;
-        let logCount = 0;
         let isLogPanelOpen = false;
 
         const API_BASE = window.location.protocol + '//' + window.location.host;
-        
-        // 从URL参数获取token并保存到localStorage
+
         function initTokenFromUrl() {
             const urlParams = new URLSearchParams(window.location.search);
             const token = urlParams.get('token');
             if (token) {
                 localStorage.setItem('token', token);
-                // 从URL中移除token参数，避免暴露
                 const url = new URL(window.location.href);
                 url.searchParams.delete('token');
                 window.history.replaceState({}, '', url.toString());
             }
         }
-        
-        // 初始化token
         initTokenFromUrl();
-        
-        // 通用的fetch包装，自动添加Authorization头
+
         function authFetch(url, options = {}) {
             const token = localStorage.getItem('token');
-            console.log('authFetch - URL:', url);
-            console.log('authFetch - Token存在:', !!token);
             if (token) {
-                if (!options.headers) {
-                    options.headers = {};
-                }
+                if (!options.headers) options.headers = {};
                 options.headers['Authorization'] = `Bearer ${token}`;
-                // 禁用缓存
                 options.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
                 options.headers['Pragma'] = 'no-cache';
                 options.headers['Expires'] = '0';
@@ -1590,119 +1266,57 @@
         }
 
         function addLog(message, type = 'info') {
-                const container = document.getElementById('logContainer');
-                const content = document.getElementById('logContent');
-                const toggleBtn = document.getElementById('logToggleBtn');
-                const badge = document.getElementById('logBadge');
-                
-                // 显示按钮
-                toggleBtn.style.display = 'flex';
-                
-                // 添加新日志
-                const item = document.createElement('div');
-                item.className = 'log-item' + (type === 'success' ? ' log-success' : type === 'error' ? ' log-error' : '');
-                const time = new Date().toLocaleTimeString();
-                item.textContent = `[${time}] ${message}`;
-                content.appendChild(item);
-                
-                // 滚动到底部
-                container.scrollTop = container.scrollHeight;
-                
-                // 更新计数器
-                logCount++;
-                badge.textContent = logCount;
-                badge.style.display = 'flex';
-                
-                // 如果面板没打开，添加脉冲动画
-                if (!isLogPanelOpen) {
-                    toggleBtn.classList.add('has-new');
-                }
-            }
+            const container = document.getElementById('logContainer');
+            const content = document.getElementById('logContent');
+            const item = document.createElement('div');
+            item.className = 'log-item' + (type === 'success' ? ' log-success' : type === 'error' ? ' log-error' : '');
+            const time = new Date().toLocaleTimeString();
+            item.textContent = `[${time}] ${message}`;
+            content.appendChild(item);
+            container.scrollTop = container.scrollHeight;
+        }
 
-            function toggleLogPanel() {
-                const container = document.getElementById('logContainer');
-                const toggleBtn = document.getElementById('logToggleBtn');
-                const badge = document.getElementById('logBadge');
-                const logPanel = document.querySelector('.log-panel');
-                
-                isLogPanelOpen = !isLogPanelOpen;
-                
-                if (isLogPanelOpen) {
-                    container.classList.add('active');
-                    toggleBtn.classList.remove('has-new');
-                    badge.style.display = 'none';
-                    logCount = 0;
-                    // 隐藏日志按钮
-                    logPanel.style.display = 'none';
-                } else {
-                    container.classList.remove('active');
-                    // 显示日志按钮
-                    logPanel.style.display = 'flex';
-                }
-            }
+        function toggleLogPanel() {
+            const container = document.getElementById('logContainer');
+            isLogPanelOpen = !isLogPanelOpen;
+            container.classList.toggle('active', isLogPanelOpen);
+        }
 
-            function closeLog() {
-                const container = document.getElementById('logContainer');
-                const logPanel = document.querySelector('.log-panel');
-                isLogPanelOpen = false;
-                container.classList.remove('active');
-                logPanel.style.display = 'flex';
-            }
+        function closeLog() {
+            const container = document.getElementById('logContainer');
+            isLogPanelOpen = false;
+            container.classList.remove('active');
+        }
 
         function doSearch(pg = 1, append = false) {
             if (isSearching) return;
-            
-            // 如果是第一页且不追加，从输入框获取关键词，否则使用保存的关键词
             const keyword = (pg === 1 && !append) ? document.getElementById('searchInput').value.trim() : currentKeyword;
             if (!keyword) {
                 toastWarning('提示', '请输入搜索关键词');
                 return;
             }
-
             isSearching = true;
-            
             if (!append) {
-                allResults = []; // 不追加模式清空数据
+                allResults = [];
                 currentPage = 1;
                 currentApiPage = 1;
-                currentKeyword = keyword; // 保存关键词
+                currentKeyword = keyword;
             }
-            
             document.getElementById('searchBtn').disabled = true;
             document.getElementById('searchBtn').textContent = append ? '加载中...' : '搜索中...';
-            
-            // 如果是加载更多模式，设置加载更多按钮的加载状态
-            if (append) {
-                const loadMoreBtn = document.getElementById('loadMoreBtn');
-                if (loadMoreBtn) {
-                    loadMoreBtn.disabled = true;
-                    loadMoreBtn.innerHTML = `
-                        <span style="display: inline-block; animation: spin 1s linear infinite; margin-right: 5px;">⏳</span>
-                        加载中...
-                    `;
-                }
-            }
-            
+
             if (!append) {
                 document.getElementById('logContent').innerHTML = '';
                 document.getElementById('stats').style.display = 'none';
                 document.getElementById('viewToggle').style.display = 'none';
-                
-                // 重置日志状态
-                logCount = 0;
-                const badge = document.getElementById('logBadge');
-                badge.textContent = '0';
-                badge.style.display = 'none';
-                document.getElementById('logToggleBtn').classList.remove('has-new');
                 document.getElementById('resultsGrid').style.display = 'none';
                 document.getElementById('resultsTable').style.display = 'none';
                 document.getElementById('pagination').style.display = 'none';
             }
 
-            addLog(append ? `加载第 ${pg} 页: ` + keyword : `开始搜索第 ${pg} 页: ` + keyword, 'info');
+            addLog(append ? `加载第 ${pg} 页: ${keyword}` : `开始搜索第 ${pg} 页: ${keyword}`, 'info');
 
             const url = `${API_BASE}/api/vod-aggregated/search/aggregate/stream/public?keyword=${encodeURIComponent(keyword)}&pg=${pg}`;
-            
             eventSource = new EventSource(url);
             let searchEnded = false;
 
@@ -1712,34 +1326,22 @@
 
             eventSource.addEventListener('data', (event) => {
                 const data = JSON.parse(event.data);
-                
-                // 去重逻辑 - 根据标题和年份判断
                 const uniqueResults = data.list.filter(newItem => {
                     const newTitle = (newItem.title || '').toLowerCase().trim();
                     const newYear = newItem.year || '';
-                    
-                    // 检查是否已存在
-                    const isDuplicate = allResults.some(existingItem => {
+                    return !allResults.some(existingItem => {
                         const existingTitle = (existingItem.title || '').toLowerCase().trim();
                         const existingYear = existingItem.year || '';
-                        
-                        // 标题相同且年份相同视为同一视频
                         return newTitle === existingTitle && newYear === existingYear;
                     });
-                    
-                    return !isDuplicate;
                 });
-                
                 const removedCount = data.list.length - uniqueResults.length;
                 const actualCount = uniqueResults.length;
-                
-                // 显示数据源结果，包含去重信息
                 if (removedCount > 0) {
-                    addLog(`✅ ${data.source} 返回 ${data.count} 个结果 | 🔍 去重 ${removedCount} 个 | 新增 ${actualCount} 个`, 'success');
+                    addLog(`✅ ${data.source} 返回 ${data.count} 个结果 | 去重 ${removedCount} 个 | 新增 ${actualCount} 个`, 'success');
                 } else {
                     addLog(`✅ ${data.source} 返回 ${data.count} 个结果 | 新增 ${actualCount} 个`, 'success');
                 }
-                
                 allResults = allResults.concat(uniqueResults);
                 renderResults();
             });
@@ -1748,75 +1350,45 @@
                 try {
                     const data = JSON.parse(event.data);
                     addLog(`❌ ${data.source || ''} ${data.message || '搜索错误'}`, 'error');
-                } catch (e) {
-                    // 忽略解析错误，可能不是自定义的error事件
-                }
+                } catch (e) {}
             });
 
             eventSource.addEventListener('end', (event) => {
                 searchEnded = true;
                 const data = JSON.parse(event.data);
                 let endMessage = `搜索完成，共找到 ${data.total} 个结果`;
-                if (data.successSources !== undefined) {
-                    endMessage += `，成功 ${data.successSources} 个源`;
-                }
-                if (data.failedSources !== undefined) {
-                    endMessage += `，失败 ${data.failedSources} 个源`;
-                }
-                if (data.searchedSources !== undefined) {
-                    endMessage += `，总计 ${data.searchedSources} 个源`;
-                }
-                
+                if (data.successSources !== undefined) endMessage += `，成功 ${data.successSources} 个源`;
+                if (data.failedSources !== undefined) endMessage += `，失败 ${data.failedSources} 个源`;
+                if (data.searchedSources !== undefined) endMessage += `，总计 ${data.searchedSources} 个源`;
                 addLog(endMessage, 'success');
+                
                 document.getElementById('stats').style.display = 'block';
                 let statsText = `已找到 ${allResults.length} 个结果（第${currentApiPage}页）`;
                 if (data.successSources !== undefined && data.searchedSources !== undefined) {
                     statsText += `，${data.successSources}/${data.searchedSources} 个源成功`;
                 }
                 document.getElementById('statsText').textContent = statsText;
-                
-                // 更新API已加载的最大页码
-                if (currentApiPage < pg) {
-                    currentApiPage = pg;
-                }
-                
+
+                if (currentApiPage < pg) currentApiPage = pg;
                 isSearching = false;
                 document.getElementById('searchBtn').disabled = false;
                 document.getElementById('searchBtn').textContent = '搜索';
                 eventSource.close();
-                
-                // 恢复加载更多按钮状态
-                const loadMoreBtn = document.getElementById('loadMoreBtn');
-                if (loadMoreBtn) {
-                    loadMoreBtn.disabled = false;
-                    loadMoreBtn.innerHTML = `
-                        加载更多 (API第${currentApiPage + 1}页)
-                    `;
-                }
-                
+
                 if (allResults.length > 0) {
                     document.getElementById('viewToggle').style.display = 'flex';
                 }
             });
 
             eventSource.onerror = (err) => {
-                console.error('EventSource error:', err);
-                
-                // 如果搜索已经结束，忽略错误
-                if (searchEnded) {
-                    return;
+                if (!searchEnded) {
+                    addLog('连接波动，继续搜索中...', 'info');
                 }
-                
-                addLog('连接波动，继续搜索中...', 'info');
-                
-                // 不关闭连接，让后端继续发送其他源的数据
-                // 由后端的end事件来结束整个搜索过程
             };
         }
 
         function setView(view) {
             currentView = view;
-            // 更新主视图切换按钮
             const viewButtons = document.querySelectorAll('.view-toggle button');
             viewButtons.forEach(btn => btn.classList.remove('active'));
             viewButtons[view === 'grid' ? 0 : 1].classList.add('active');
@@ -1825,7 +1397,6 @@
 
         function renderResults() {
             if (allResults.length === 0) return;
-
             const totalPages = Math.ceil(allResults.length / pageSize);
             const startIndex = (currentPage - 1) * pageSize;
             const endIndex = startIndex + pageSize;
@@ -1840,7 +1411,6 @@
                 document.getElementById('resultsTable').style.display = 'block';
                 renderTableView(pageResults, startIndex);
             }
-
             renderPagination(totalPages);
         }
 
@@ -1860,7 +1430,6 @@
                             <span class="card-source">${item.sourceName}</span>
                         </div>
                         ${item.type ? `<span class="card-type">${item.type}</span>` : ''}
-                        <div class="card-desc">${item.desc || '暂无简介'}</div>
                     </div>
                 </div>
             `).join('');
@@ -1873,11 +1442,10 @@
                     <table class="table">
                         <thead>
                             <tr>
-                                <th style="width: 80px;">封面</th>
+                                <th style="width: 60px;">封面</th>
                                 <th>标题</th>
-                                <th style="width: 80px;">年份</th>
-                                <th style="width: 100px;">类型</th>
-                                <th style="width: 120px;">来源</th>
+                                <th style="width: 60px;">年份</th>
+                                <th style="width: 80px;">来源</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1886,12 +1454,11 @@
                                     <td>
                                         ${item.pic 
                                             ? `<img class="thumbnail" src="${item.pic}" alt="${item.title}">`
-                                            : `<div class="thumbnail" style="display:flex;align-items:center;justify-content:center;font-size:24px;">🎬</div>`
+                                            : `<div class="thumbnail" style="display:flex;align-items:center;justify-content:center;font-size:20px;">🎬</div>`
                                         }
                                     </td>
-                                    <td style="max-width: 300px;">${item.title}</td>
+                                    <td style="max-width: 150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.title}</td>
                                     <td>${item.year || '-'}</td>
-                                    <td>${item.type ? `<span class="tag tag-type">${item.type}</span>` : '-'}</td>
                                     <td><span class="tag tag-source">${item.sourceName}</span></td>
                                 </tr>
                             `).join('')}
@@ -1905,30 +1472,22 @@
             const container = document.getElementById('pagination');
             container.style.display = 'flex';
             
-            let html = `
-                <button onclick="goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>上一页</button>
-            `;
+            let html = `<button onclick="goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>上一页</button>`;
             
             for (let i = 1; i <= totalPages; i++) {
-                if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+                if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
                     html += `<button class="${i === currentPage ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
-                } else if (i === currentPage - 3 || i === currentPage + 3) {
+                } else if (i === currentPage - 2 || i === currentPage + 2) {
                     html += `<span style="padding: 8px;">...</span>`;
                 }
             }
             
-            // 恢复原来的下一页按钮
             html += `
                 <button onclick="goToPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>下一页</button>
-            `;
-            
-            // 添加加载下一页API的按钮
-            html += `
-                <button id="loadMoreBtn" onclick="loadNextApiPage()" style="margin-left: 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
-                    加载更多 (API第${currentApiPage + 1}页)
+                <button id="loadMoreBtn" onclick="loadNextApiPage()" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    加载更多
                 </button>
             `;
-            
             container.innerHTML = html;
         }
 
@@ -1938,34 +1497,31 @@
             renderResults();
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
-        
+
         function loadNextApiPage() {
             doSearch(currentApiPage + 1, true);
         }
+
+        let hlsPlayer = null;
+        let currentPoster = '';
+        let isFavorited = false;
 
         function showDetail(index) {
             const item = allResults[index];
             if (!item) return;
 
-            console.log('显示详情，item 数据:', item);
-            console.log('episodes:', item.episodes);
-
             document.getElementById('modalTitle').textContent = item.title;
             document.getElementById('playerContainer').classList.remove('active');
-            
-            // 保存当前视频的海报
             currentPoster = item.pic || '';
+            isFavorited = false;
+            checkFavorite(item.id);
 
-            // 按播放源分组显示
             let episodesHtml = '';
             if (item.episodes && item.episodes.length > 0) {
-                // 按 source 分组
                 const sourceGroups = {};
                 item.episodes.forEach(ep => {
                     const source = ep.source || '默认';
-                    if (!sourceGroups[source]) {
-                        sourceGroups[source] = [];
-                    }
+                    if (!sourceGroups[source]) sourceGroups[source] = [];
                     sourceGroups[source].push(ep);
                 });
 
@@ -1983,21 +1539,16 @@
                     `;
                 }).join('');
             } else {
-                // 如果没有 episodes，显示一个默认播放按钮
                 episodesHtml = `
                     <div class="episodes">
                         <h4>📺 播放</h4>
                         <div class="episode-grid">
-                            <button class="episode-btn" onclick="alert('暂无播放链接，数据解析可能有问题，请检查控制台日志')">播放</button>
-                        </div>
-                        <div style="margin-top: 10px; padding: 10px; background: #fff3cd; border-radius: 6px; font-size: 14px;">
-                            <strong>提示:</strong> 未找到播放链接，请查看浏览器控制台了解数据详情
+                            <button class="episode-btn" onclick="alert('暂无播放链接')">播放</button>
                         </div>
                     </div>
                 `;
             }
 
-            // 构建详情信息
             let detailsHtml = '';
             if (item.year) detailsHtml += `<div class="detail-row"><span class="detail-label">年份</span><span class="detail-value">${item.year}</span></div>`;
             if (item.type) detailsHtml += `<div class="detail-row"><span class="detail-label">类型</span><span class="detail-value">${item.type}</span></div>`;
@@ -2005,21 +1556,13 @@
             if (item.lang) detailsHtml += `<div class="detail-row"><span class="detail-label">语言</span><span class="detail-value">${item.lang}</span></div>`;
             if (item.actor) detailsHtml += `<div class="detail-row"><span class="detail-label">演员</span><span class="detail-value">${item.actor}</span></div>`;
             if (item.director) detailsHtml += `<div class="detail-row"><span class="detail-label">导演</span><span class="detail-value">${item.director}</span></div>`;
-            if (item.remarks) detailsHtml += `<div class="detail-row"><span class="detail-label">备注</span><span class="detail-value">${item.remarks}</span></div>`;
-            if (item.pubdate) detailsHtml += `<div class="detail-row"><span class="detail-label">首播</span><span class="detail-value">${item.pubdate}</span></div>`;
             detailsHtml += `<div class="detail-row"><span class="detail-label">来源</span><span class="detail-value">${item.sourceName}</span></div>`;
 
-            // 重置收藏状态
-            isFavorited = false;
-            
-            // 检查是否已收藏
-            checkFavorite(item.id);
-            
             document.getElementById('movieInfo').innerHTML = `
                 <div class="movie-info">
                     ${item.pic
                         ? `<img class="movie-poster" src="${item.pic}" alt="${item.title}">`
-                        : `<div class="movie-poster" style="display:flex;align-items:center;justify-content:center;font-size:80px;background:#f0f0f0;">🎬</div>`
+                        : `<div class="movie-poster" style="display:flex;align-items:center;justify-content:center;font-size:60px;background:#f0f0f0;">🎬</div>`
                     }
                     <div class="movie-details">
                         <h3>${item.title}</h3>
@@ -2029,139 +1572,95 @@
                         </button>
                     </div>
                 </div>
-                ${item.desc ? `
-                    <div class="movie-desc">
-                        <strong>简介</strong>
-                        <p>${item.desc}</p>
-                    </div>
-                ` : ''}
+                ${item.desc ? `<div class="movie-desc"><strong>简介</strong><p>${item.desc}</p></div>` : ''}
                 ${episodesHtml}
             `;
 
             document.getElementById('modal').classList.add('active');
         }
 
-        let hlsPlayer = null;
-        let currentPoster = '';  // 保存当前视频的海报
-
         function playVideo(url, name) {
             const playerContainer = document.getElementById('playerContainer');
             const videoPlayer = document.getElementById('videoPlayer');
-            
-            // 先停止之前的播放
+
             if (hlsPlayer) {
                 hlsPlayer.destroy();
                 hlsPlayer = null;
             }
-            
             videoPlayer.pause();
             videoPlayer.src = '';
-            
+
             playerContainer.classList.add('active');
             playerContainer.classList.add('player-loading');
-            videoPlayer.poster = currentPoster;  // 设置视频海报
-            
-            console.log('开始播放:', name, url);
-            console.log('使用海报:', currentPoster);
-            
-            // 判断是否是m3u8
+            videoPlayer.poster = currentPoster;
+
             if (url.includes('.m3u8')) {
                 if (Hls.isSupported()) {
-                    // 使用HLS.js
                     hlsPlayer = new Hls({
                         enableWorker: true,
-                        lowLatencyMode: false,  // 关闭低延迟模式，提高稳定性
                         maxBufferLength: 30,
-                        maxMaxBufferLength: 60,
                         startLevel: 0
                     });
-                    
                     hlsPlayer.loadSource(url);
                     hlsPlayer.attachMedia(videoPlayer);
-                    
                     hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => {
-                        console.log('HLS 清单解析成功，开始播放');
                         playerContainer.classList.remove('player-loading');
-                        videoPlayer.play().catch(e => {
-                            console.log('自动播放失败，请手动点击播放');
-                        });
+                        videoPlayer.play().catch(e => {});
                     });
-                    
                     hlsPlayer.on(Hls.Events.ERROR, (event, data) => {
-                        console.error('HLS 错误:', data);
-                        
+                        console.error('HLS Error:', data);
                         if (data.fatal) {
                             playerContainer.classList.remove('player-loading');
                             let errorMsg = '视频加载失败';
                             switch(data.type) {
                                 case Hls.ErrorTypes.NETWORK_ERROR:
-                                    errorMsg = `网络错误: ${data.details || '加载失败'}\n\nURL: ${url}`;
-                                    console.log('尝试恢复网络错误...');
+                                    errorMsg = `网络错误`;
                                     hlsPlayer.startLoad();
                                     break;
                                 case Hls.ErrorTypes.MEDIA_ERROR:
-                                    errorMsg = `媒体错误: ${data.details || '解码失败'}`;
-                                    console.log('尝试恢复媒体错误...');
+                                    errorMsg = `媒体错误`;
                                     hlsPlayer.recoverMediaError();
                                     break;
                                 default:
-                                    errorMsg = `未知错误: ${data.details}`;
+                                    errorMsg = `未知错误`;
                                     hlsPlayer.destroy();
                                     hlsPlayer = null;
                                     break;
                             }
-                            toastError('播放失败', errorMsg + '\n建议尝试其他播放源或稍后再试。');
+                            toastError('播放失败', errorMsg);
                         }
                     });
                 } else if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
-                    // Safari原生支持
-                    console.log('使用Safari原生HLS支持');
                     videoPlayer.src = url;
-                    
-                    // 添加加载和错误处理
-                    videoPlayer.oncanplay = () => {
-                        playerContainer.classList.remove('player-loading');
-                    };
+                    videoPlayer.oncanplay = () => playerContainer.classList.remove('player-loading');
                     videoPlayer.onerror = () => {
                         playerContainer.classList.remove('player-loading');
-                        toastError('加载失败', '视频加载失败，请检查网络连接或尝试其他播放源。');
+                        toastError('加载失败', '视频加载失败');
                     };
-                    
-                    videoPlayer.play().catch(e => console.log('自动播放失败'));
+                    videoPlayer.play().catch(e => {});
                 } else {
                     playerContainer.classList.remove('player-loading');
-                    toastError('不支持', '您的浏览器不支持HLS视频播放，建议使用Chrome、Firefox或Safari浏览器。');
+                    toastError('不支持', '您的浏览器不支持HLS视频播放');
                 }
             } else {
-                // 普通视频
-                console.log('播放普通视频');
                 videoPlayer.src = url;
-                
-                // 添加加载和错误处理
-                videoPlayer.oncanplay = () => {
-                    playerContainer.classList.remove('player-loading');
-                };
+                videoPlayer.oncanplay = () => playerContainer.classList.remove('player-loading');
                 videoPlayer.onerror = () => {
                     playerContainer.classList.remove('player-loading');
-                    toastError('加载失败', '视频加载失败: ' + (videoPlayer.error?.message || '未知错误'));
+                    toastError('加载失败', '视频加载失败');
                 };
-                
-                videoPlayer.play().catch(e => console.log('自动播放失败，请手动点击播放'));
+                videoPlayer.play().catch(e => {});
             }
-            
             playerContainer.scrollIntoView({ behavior: 'smooth' });
         }
 
         function closePlayer() {
             const playerContainer = document.getElementById('playerContainer');
             const videoPlayer = document.getElementById('videoPlayer');
-            
-            // 清理HLS播放器
             if (hlsPlayer) {
                 hlsPlayer.destroy();
                 hlsPlayer = null;
             }
-            
             videoPlayer.pause();
             videoPlayer.src = '';
             playerContainer.classList.remove('active');
@@ -2173,54 +1672,34 @@
         }
 
         document.getElementById('modal').addEventListener('click', (e) => {
-            if (e.target === document.getElementById('modal')) {
-                closeModal();
-            }
+            if (e.target === document.getElementById('modal')) closeModal();
         });
 
-        // 收藏功能相关
-        let isFavorited = false;
-        
         async function checkFavorite(vodId) {
             try {
-                console.log('checkFavorite - 开始检查, vodId:', vodId);
-                console.log('checkFavorite - localStorage中的token:', !!localStorage.getItem('token'));
-                
-                // 添加时间戳防止缓存
                 const url = `${API_BASE}/api/favorites/check/${vodId}?t=${Date.now()}`;
                 const response = await authFetch(url);
-                console.log('checkFavorite - 响应状态:', response.status);
-                
                 const data = await response.json();
-                console.log('checkFavorite - 响应数据:', data);
                 isFavorited = data.isFavorited;
                 updateFavoriteBtn();
-            } catch (e) {
-                console.log('检查收藏状态失败:', e);
-            }
+            } catch (e) {}
         }
-        
+
         async function toggleFavorite(item) {
             try {
                 if (isFavorited) {
-                    // 取消收藏
-                    const response = await authFetch(`${API_BASE}/api/favorites/${item.id}`, {
-                        method: 'DELETE'
-                    });
-                    
+                    const response = await authFetch(`${API_BASE}/api/favorites/${item.id}`, { method: 'DELETE' });
                     if (response.ok) {
                         isFavorited = false;
                         toastSuccess('成功', '已取消收藏');
                     } else if (response.status === 401) {
                         const data = await response.json();
-                        toastWarning('提示', data.error || '请先登录后再操作');
+                        toastWarning('提示', data.error || '请先登录');
                         openLoginModal();
                     } else {
-                        const data = await response.json();
-                        toastError('失败', data.error || '操作失败');
+                        toastError('失败', '操作失败');
                     }
                 } else {
-                    // 添加收藏 - 把当前搜索数据转换为收藏格式
                     const favoriteData = {
                         vod_id: item.id,
                         vod_name: item.title,
@@ -2228,29 +1707,18 @@
                         vod_type: item.type,
                         vod_content: item.desc,
                         vod_pic: item.pic,
-                        vod_pic_thumb: item.picThumb,
-                        vod_pic_slide: item.picSlide,
                         vod_actor: item.actor,
                         vod_director: item.director,
-                        vod_remarks: item.remarks,
                         vod_area: item.area,
                         vod_lang: item.lang,
-                        vod_pubdate: item.pubdate,
-                        vod_play_from: item.playFrom,
                         source_name: item.sourceName,
-                        source_id: item.sourceId,
                         episodes: item.episodes
                     };
-                    
-                    console.log('发送收藏数据:', favoriteData);
-                    console.log('episodes:', favoriteData.episodes);
-                    
                     const response = await authFetch(`${API_BASE}/api/favorites`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(favoriteData)
                     });
-                    
                     if (response.ok) {
                         isFavorited = true;
                         toastSuccess('成功', '收藏成功！');
@@ -2259,17 +1727,15 @@
                         toastWarning('提示', data.error || '请先登录后再收藏');
                         openLoginModal();
                     } else {
-                        const data = await response.json();
-                        toastError('失败', data.error || '收藏失败');
+                        toastError('失败', '收藏失败');
                     }
                 }
                 updateFavoriteBtn();
             } catch (e) {
-                console.error('操作失败:', e);
                 toastError('失败', '操作失败，请稍后再试');
             }
         }
-        
+
         function updateFavoriteBtn() {
             const btn = document.getElementById('favoriteBtn');
             if (btn) {
@@ -2277,7 +1743,7 @@
                 btn.innerHTML = isFavorited ? '❤️ 已收藏' : '🤍 收藏';
             }
         }
-        
+
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 closeModal();
@@ -2286,26 +1752,9 @@
             }
         });
 
-        // 设置菜单功能
-        function toggleSettingsMenu() {
-            const menu = document.getElementById('settingsMenu');
-            menu.classList.toggle('active');
-        }
-
-        // 点击其他地方关闭菜单
-        document.addEventListener('click', (e) => {
-            const menu = document.getElementById('settingsMenu');
-            const btn = document.querySelector('.settings-btn');
-            if (!menu.contains(e.target) && !btn.contains(e.target)) {
-                menu.classList.remove('active');
-            }
-        });
-
-        // 侧边栏功能
         function openFavorites() {
             document.getElementById('sidebarOverlay').classList.add('active');
             document.getElementById('favoritesSidebar').classList.add('active');
-            setupFavoritesScrollListener();
             loadFavorites();
         }
 
@@ -2314,18 +1763,6 @@
             document.getElementById('favoritesSidebar').classList.remove('active');
         }
 
-        // 处理侧边栏覆盖层点击
-        function handleSidebarOverlayClick() {
-            // 如果详情模态框是打开的，不关闭侧边栏
-            const modal = document.getElementById('modal');
-            if (modal && modal.classList.contains('active')) {
-                return;
-            }
-            // 否则关闭侧边栏
-            closeSidebar();
-        }
-
-        // 加载收藏列表
         async function loadFavorites(append = false) {
             if (favoritesLoading) return;
             if (!append) {
@@ -2334,66 +1771,55 @@
                 favoritesList = [];
             }
             if (!favoritesHasMore && append) return;
-            
+
             favoritesLoading = true;
             const container = document.getElementById('favoritesContent');
-            
+
             if (!append) {
                 container.innerHTML = '<div class="load-more spinner"><div class="load-more-spinner"></div> 加载中...</div>';
-            } else {
-                const loadMoreDiv = document.createElement('div');
-                loadMoreDiv.className = 'load-more spinner';
-                loadMoreDiv.id = 'loadingMore';
-                loadMoreDiv.innerHTML = '<div class="load-more-spinner"></div> 加载中...';
-                container.appendChild(loadMoreDiv);
             }
-            
+
             try {
                 const response = await authFetch(`${API_BASE}/api/favorites?page=${favoritesPage}&pageSize=20&t=${Date.now()}`);
-                
-                // 移除加载中提示
-                const loadingEl = document.getElementById('loadingMore');
-                if (loadingEl) loadingEl.remove();
-                
+
                 if (!response.ok) {
                     if (response.status === 401) {
                         container.innerHTML = `
                             <div class="empty-favorites">
                                 <div class="icon">🔐</div>
                                 <p>请先登录后查看收藏</p>
-                                <button onclick="openLoginModal()" style="margin-top: 16px; padding: 10px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s;">登录</button>
+                                <button onclick="openLoginModal()">登录</button>
                             </div>
                         `;
                         return;
                     }
                     throw new Error('获取收藏失败');
                 }
-                
+
                 const data = await response.json();
                 const newItems = data.list || [];
-                
+
                 if (!append) {
                     favoritesList = newItems;
                 } else {
                     favoritesList = favoritesList.concat(newItems);
                 }
-                
+
                 favoritesHasMore = data.hasMore;
                 favoritesPage++;
-                
+
                 if (favoritesList.length === 0) {
                     container.innerHTML = `
                         <div class="empty-favorites">
                             <div class="icon">💔</div>
                             <p>暂无收藏</p>
-                            <p style="font-size: 13px; margin-top: 8px;">快去搜索并收藏喜欢的内容吧！</p>
+                            <p style="font-size: 12px; margin-top: 6px;">快去搜索并收藏喜欢的内容吧！</p>
                         </div>
                     `;
                     return;
                 }
-                
-                const renderItems = append ? newItems : favoritesList;
-                const html = renderItems.map(item => `
+
+                const html = favoritesList.map(item => `
                     <div class="favorite-item" onclick="openFavoriteDetail(${JSON.stringify(item).replace(/"/g, '&quot;')})">
                         ${item.vod_pic ? `
                             <img class="favorite-item-img" src="${item.vod_pic}" alt="${item.vod_name}" loading="lazy">
@@ -2408,40 +1834,22 @@
                                 ${item.source_name ? `<span class="favorite-item-tag" style="background: #2ed573;">${item.source_name}</span>` : ''}
                             </div>
                             <div class="favorite-item-actions">
-                                <button class="favorite-item-delete" onclick="event.stopPropagation(); deleteFavorite('${item.vod_id}', '${(item.vod_name || '未知标题').replace(/'/g, "\\'")}', this)">
-                                    删除
-                                </button>
+                                <button class="favorite-item-delete" onclick="event.stopPropagation(); deleteFavorite('${item.vod_id}', '${(item.vod_name || '未知标题').replace(/'/g, "\\'")}', this)">删除</button>
                             </div>
                         </div>
                     </div>
                 `).join('');
-                
-                if (!append) {
-                    container.innerHTML = html;
-                } else {
-                    container.insertAdjacentHTML('beforeend', html);
-                }
-                
-                // 添加加载更多提示
-                if (favoritesHasMore) {
-                    const loadMoreDiv = document.createElement('div');
-                    loadMoreDiv.className = 'load-more';
-                    loadMoreDiv.id = 'loadMoreTip';
-                    loadMoreDiv.textContent = '上滑加载更多...';
-                    container.appendChild(loadMoreDiv);
-                }
-                
+
+                container.innerHTML = html;
+
             } catch (e) {
                 console.error('加载收藏失败:', e);
-                const loadingEl = document.getElementById('loadingMore');
-                if (loadingEl) loadingEl.remove();
-                
                 if (!append) {
                     container.innerHTML = `
                         <div class="empty-favorites">
                             <div class="icon">❌</div>
                             <p>加载失败</p>
-                            <p style="font-size: 13px; margin-top: 8px;">请稍后重试</p>
+                            <p style="font-size: 12px; margin-top: 6px;">请稍后重试</p>
                         </div>
                     `;
                 }
@@ -2449,50 +1857,21 @@
                 favoritesLoading = false;
             }
         }
-        
-        // 侧边栏滚动监听
-        let scrollListenerAdded = false;
-        function setupFavoritesScrollListener() {
-            if (scrollListenerAdded) return;
-            
-            const content = document.getElementById('favoritesContent');
-            content.addEventListener('scroll', () => {
-                const scrollTop = content.scrollTop;
-                const scrollHeight = content.scrollHeight;
-                const clientHeight = content.clientHeight;
-                
-                // 距离底部 100px 时加载更多
-                if (scrollTop + clientHeight >= scrollHeight - 100) {
-                    loadFavorites(true);
-                }
-            });
-            scrollListenerAdded = true;
-        }
 
-        // 打开收藏详情
         function openFavoriteDetail(item) {
-            console.log('打开收藏详情, item:', item);
-            console.log('vod_episodes:', item.vod_episodes, '类型:', typeof item.vod_episodes);
-            
-            // 不关闭侧边栏，让用户可以继续查看其他收藏
-            // 转换收藏数据格式为搜索结果格式
-            
             let episodes = [];
             if (item.vod_episodes) {
                 if (typeof item.vod_episodes === 'string') {
                     try {
                         episodes = JSON.parse(item.vod_episodes);
                     } catch (e) {
-                        console.log('解析 episodes 失败:', e);
                         episodes = [];
                     }
                 } else if (Array.isArray(item.vod_episodes)) {
                     episodes = item.vod_episodes;
-                } else if (typeof item.vod_episodes === 'object') {
-                    episodes = item.vod_episodes;
                 }
             }
-            
+
             const searchItem = {
                 id: item.vod_id,
                 title: item.vod_name,
@@ -2500,52 +1879,21 @@
                 type: item.vod_type,
                 desc: item.vod_content,
                 pic: item.vod_pic,
-                picThumb: item.vod_pic_thumb,
-                picSlide: item.vod_pic_slide,
                 actor: item.vod_actor,
                 director: item.vod_director,
-                remarks: item.vod_remarks,
                 area: item.vod_area,
                 lang: item.vod_lang,
-                pubdate: item.vod_pubdate,
-                playFrom: item.vod_play_from,
                 sourceName: item.source_name,
-                sourceId: item.source_id,
                 episodes: episodes
             };
-            
-            console.log('转换后的 searchItem:', searchItem);
-            console.log('episodes:', searchItem.episodes);
-            
-            // 将当前项添加到搜索结果中，以便详情页能找到
+
             allResults = [searchItem, ...allResults];
             showDetail(0);
         }
 
-        // 删除收藏
         function deleteFavorite(vodId, title, btn) {
             openDeleteConfirmModal(vodId, title, btn);
         }
-        
-        // 页面初始化
-        document.addEventListener('DOMContentLoaded', function() {
-            const settingsPanel = document.querySelector('.settings-panel');
-            const logPanel = document.querySelector('.log-panel');
-            settingsPanel.style.display = 'flex';
-            logPanel.style.display = 'flex';
-            
-            // 搜索框悬浮监听
-            const searchBox = document.querySelector('.search-box');
-            const searchBoxOriginalTop = searchBox.offsetTop + 200; // 下滑200px后悬浮
-            
-            window.addEventListener('scroll', function() {
-                if (window.scrollY > searchBoxOriginalTop) {
-                    searchBox.classList.add('sticky');
-                } else {
-                    searchBox.classList.remove('sticky');
-                }
-            });
-        });
     </script>
 </body>
 </html>
