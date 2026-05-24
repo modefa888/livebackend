@@ -30,7 +30,7 @@ const authorizeAdmin = (req, res, next) => {
 
 // 获取登录日志列表（仅管理员）
 router.get('/', authenticateToken, authorizeAdmin, async (req, res) => {
-  const { page = 1, limit = 10, username, status } = req.query;
+  const { page = 1, limit = 10, username, status, startDate, endDate } = req.query;
   const offset = (page - 1) * limit;
 
   try {
@@ -39,13 +39,23 @@ router.get('/', authenticateToken, authorizeAdmin, async (req, res) => {
     let queryParams = [];
 
     if (username) {
-      whereClause.push('username LIKE ?');
-      queryParams.push(`%${username}%`);
+      whereClause.push('username = ?');
+      queryParams.push(username);
     }
 
     if (status !== undefined) {
       whereClause.push('status = ?');
       queryParams.push(status);
+    }
+
+    if (startDate) {
+      whereClause.push('loginTime >= ?');
+      queryParams.push(startDate);
+    }
+
+    if (endDate) {
+      whereClause.push('loginTime <= ?');
+      queryParams.push(endDate + ' 23:59:59');
     }
 
     const whereSql = whereClause.length > 0 ? `WHERE ${whereClause.join(' AND ')}` : '';
@@ -115,6 +125,58 @@ router.get('/me', authenticateToken, async (req, res) => {
       res.status(500).json({ message: '数据库连接超时，请稍后再试' });
     } else {
       console.error('获取登录日志错误:', error.message);
+      res.status(500).json({ message: '服务器内部错误' });
+    }
+  }
+});
+
+// 获取用于可视化分析的完整登录日志（不限分页）
+router.get('/visualization', authenticateToken, authorizeAdmin, async (req, res) => {
+  const { startDate, endDate, username, status } = req.query;
+
+  try {
+    // 构建查询条件
+    let whereClause = [];
+    let queryParams = [];
+
+    if (username) {
+      whereClause.push('username = ?');
+      queryParams.push(username);
+    }
+
+    if (status !== undefined) {
+      whereClause.push('status = ?');
+      queryParams.push(status);
+    }
+
+    if (startDate) {
+      whereClause.push('loginTime >= ?');
+      queryParams.push(startDate);
+    }
+
+    if (endDate) {
+      whereClause.push('loginTime <= ?');
+      queryParams.push(endDate + ' 23:59:59');
+    }
+
+    const whereSql = whereClause.length > 0 ? `WHERE ${whereClause.join(' AND ')}` : '';
+
+    // 查询所有符合条件的登录日志（不分页）
+    const [logs] = await db.execute(
+      `SELECT id, userId, username, ip, userAgent, loginTime, status FROM login_logs ${whereSql} ORDER BY loginTime DESC`,
+      queryParams
+    );
+
+    res.status(200).json({
+      logs,
+      total: logs.length
+    });
+  } catch (error) {
+    if (error.code === 'ETIMEDOUT' || error.code === 'ECONNREFUSED') {
+      console.error('获取可视化数据错误: 数据库连接超时');
+      res.status(500).json({ message: '数据库连接超时，请稍后再试' });
+    } else {
+      console.error('获取可视化数据错误:', error.message);
       res.status(500).json({ message: '服务器内部错误' });
     }
   }
