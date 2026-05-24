@@ -78,8 +78,8 @@ class SystemManager {
     });
   }
 
-  // 备份数据库
-  async backupDatabase(createdBy) {
+  // 备份数据库 (支持进度回调)
+  async backupDatabase(createdBy, onProgress) {
     try {
       // 这里实现数据库备份逻辑
       const backupPath = path.join(__dirname, '../../backups');
@@ -98,27 +98,54 @@ class SystemManager {
       const [tablesResult] = await db.execute('SHOW TABLES');
       const tables = tablesResult.map(row => Object.values(row)[0]);
       
+      // 发送总表数
+      if (onProgress) {
+        onProgress({
+          type: 'start',
+          totalTables: tables.length,
+          message: `发现 ${tables.length} 个表，开始备份...`
+        });
+      }
+
       // 2. 生成备份内容
       let backupContent = '-- 数据库备份文件\n';
       backupContent += '-- 生成时间: ' + new Date().toISOString() + '\n';
       backupContent += '-- 备份创建者: ' + createdBy + '\n\n';
       
+      const tableInfos = [];
+      let completedTables = 0;
+      
       // 3. 备份每个表的结构和数据
       for (const table of tables) {
+        const tableStartTime = Date.now();
+        
+        // 发送当前处理中的表
+        if (onProgress) {
+          onProgress({
+            type: 'processing',
+            currentTable: table,
+            currentIndex: completedTables,
+            totalTables: tables.length,
+            message: `正在备份表: ${table}`
+          });
+        }
+        
         // 备份表结构
-        const [createTableResult] = await db.execute(`SHOW CREATE TABLE ${table}`);
+        const [createTableResult] = await db.execute(`SHOW CREATE TABLE \`${table}\``);
         const createTableSql = createTableResult[0]['Create Table'];
         backupContent += `-- 表结构: ${table}\n`;
         backupContent += createTableSql + ';\n\n';
         
         // 备份表数据
-        const [dataResult] = await db.execute(`SELECT * FROM ${table}`);
+        const [dataResult] = await db.execute(`SELECT * FROM \`${table}\``);
+        const rowCount = dataResult.length;
+        
         if (dataResult.length > 0) {
           backupContent += `-- 表数据: ${table}\n`;
           const columnNames = Object.keys(dataResult[0]);
           const columnList = columnNames.join(', ');
           
-          backupContent += `INSERT INTO ${table} (${columnList}) VALUES\n`;
+          backupContent += `INSERT INTO \`${table}\` (${columnList}) VALUES\n`;
           
           const values = dataResult.map(row => {
             const rowValues = columnNames.map(column => {
@@ -133,6 +160,27 @@ class SystemManager {
           });
           
           backupContent += values.join(',\n') + ';\n\n';
+        }
+        
+        completedTables++;
+        const tableEndTime = Date.now();
+        const tableInfo = {
+          name: table,
+          rowCount: rowCount,
+          status: 'completed',
+          duration: tableEndTime - tableStartTime
+        };
+        tableInfos.push(tableInfo);
+        
+        // 发送表完成进度
+        if (onProgress) {
+          onProgress({
+            type: 'table_completed',
+            table: tableInfo,
+            completedTables: completedTables,
+            totalTables: tables.length,
+            message: `表 ${table} 备份完成 (${rowCount} 条数据)`
+          });
         }
       }
       
@@ -149,6 +197,20 @@ class SystemManager {
         [backupFileName, backupFilePath, fileSize, createdBy, 'database']
       );
 
+      // 发送完成消息
+      if (onProgress) {
+        onProgress({
+          type: 'completed',
+          totalTables: tables.length,
+          completedTables: completedTables,
+          fileSize: fileSize,
+          backupPath: backupFilePath,
+          backupFileName: backupFileName,
+          tableInfos: tableInfos,
+          message: '数据库备份完成'
+        });
+      }
+
       console.log(`数据库备份完成: ${backupFilePath}`);
       return { 
         success: true, 
@@ -156,10 +218,18 @@ class SystemManager {
         path: backupFilePath,
         fileName: backupFileName,
         fileSize: fileSize,
-        tables: tables.length
+        tables: tables.length,
+        tableInfos: tableInfos
       };
     } catch (error) {
       console.error('数据库备份失败:', error);
+      // 发送错误消息
+      if (onProgress) {
+        onProgress({
+          type: 'error',
+          message: '数据库备份失败: ' + error.message
+        });
+      }
       return { success: false, message: '数据库备份失败', error: error.message };
     }
   }

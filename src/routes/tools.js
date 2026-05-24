@@ -233,17 +233,67 @@ router.get('/system/status', authenticateToken, async (req, res) => {
   }
 });
 
-// 备份数据库
+// 备份数据库 (SSE实时进度)
 router.post('/system/backup', authenticateToken, verifyAdmin, async (req, res) => {
   try {
-    const result = await systemManager.backupDatabase(req.user.username);
-    if (result.success) {
-      res.status(200).json(result);
-    } else {
-      res.status(400).json(result);
-    }
+    // 设置 SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    
+    // 进度回调函数
+    const onProgress = (data) => {
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+    
+    // 执行备份并传入回调
+    const result = await systemManager.backupDatabase(req.user.username, onProgress);
+    
+    // 备份完成后发送最终结果
+    res.write(`data: ${JSON.stringify({ type: 'final', ...result })}\n\n`);
+    
+    // 结束响应
+    res.end();
   } catch (error) {
-    res.status(500).json({ message: '备份数据库失败', error: error.message });
+    res.write(`data: ${JSON.stringify({ type: 'error', message: '备份数据库失败', error: error.message })}\n\n`);
+    res.end();
+  }
+});
+
+// 获取备份进度状态
+router.get('/system/backup-progress/status', authenticateToken, verifyAdmin, async (req, res) => {
+  try {
+    const [tablesResult] = await db.execute('SHOW TABLES');
+    const tables = tablesResult.map(row => Object.values(row)[0]);
+    
+    // 获取每个表的行数
+    const tableInfos = [];
+    for (const table of tables) {
+      try {
+        const [countResult] = await db.execute(`SELECT COUNT(*) as count FROM \`${table}\``);
+        tableInfos.push({
+          name: table,
+          rowCount: countResult[0].count,
+          status: 'pending'
+        });
+      } catch (e) {
+        tableInfos.push({
+          name: table,
+          rowCount: 0,
+          status: 'error',
+          error: e.message
+        });
+      }
+    }
+    
+    res.status(200).json({
+      success: true,
+      totalTables: tables.length,
+      tableInfos: tableInfos
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: '获取备份状态失败', error: error.message });
   }
 });
 
