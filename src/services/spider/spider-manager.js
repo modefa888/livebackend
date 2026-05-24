@@ -74,8 +74,16 @@ class SpiderManager {
 
   // 启动所有爬虫
   async startAllSpiders() {
-    // 直接更新数据库中所有爬虫的状态为启用
+    // 从数据库获取所有启用的爬虫配置
+    const [spiderConfigs] = await db.execute('SELECT * FROM spider_configs');
+    
+    // 更新数据库中所有爬虫的状态为启用
     await db.execute('UPDATE spider_configs SET isEnabled = true, updatedAt = CURRENT_TIMESTAMP');
+    
+    // 创建并启动每个爬虫实例
+    for (const config of spiderConfigs) {
+      await this.createSpider(config);
+    }
     
     info('所有爬虫已启动');
     logSpider('manager', 'startAll', 'success', '所有爬虫已启动');

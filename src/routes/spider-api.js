@@ -52,7 +52,7 @@ const rateLimiter = (count, windowMs) => {
 router.get('/configs', authenticateToken, verifyAdmin, async (req, res) => {
     try {
         const [configs] = await db.execute('SELECT * FROM spider_api_configs ORDER BY id DESC');
-        const files = fs.readdirSync(spiderLoader.spidersDir).filter(f => f.endsWith('.js'));
+        const files = fs.readdirSync(spiderLoader.spidersDir).filter(f => f.endsWith('.js') && f !== 'index.js');
 
         const result = configs.map(cfg => {
             const exists = files.includes(`${cfg.file_name}.js`);
@@ -87,7 +87,7 @@ router.get('/configs', authenticateToken, verifyAdmin, async (req, res) => {
 
 router.get('/files', authenticateToken, verifyAdmin, async (req, res) => {
     try {
-        const files = fs.readdirSync(spiderLoader.spidersDir).filter(f => f.endsWith('.js'));
+        const files = fs.readdirSync(spiderLoader.spidersDir).filter(f => f.endsWith('.js') && f !== 'index.js');
 
         const result = await Promise.all(files.map(async (file) => {
             const name = file.replace('.js', '');
@@ -246,7 +246,7 @@ router.post('/reload-all', authenticateToken, verifyAdmin, async (req, res) => {
 
 router.post('/discover', authenticateToken, verifyAdmin, async (req, res) => {
     try {
-        const files = fs.readdirSync(spiderLoader.spidersDir).filter(f => f.endsWith('.js'));
+        const files = fs.readdirSync(spiderLoader.spidersDir).filter(f => f.endsWith('.js') && f !== 'index.js');
         
         const [existingConfigs] = await db.execute('SELECT file_name FROM spider_api_configs');
         const existingFileNames = existingConfigs.map(c => c.file_name);

@@ -46,8 +46,10 @@ router.get('/configs', authenticateToken, async (req, res) => {
       // 读取目录中的所有文件
       const files = fs.readdirSync(spiderDir);
       
-      // 过滤出 .js 文件
-      const jsFiles = files.filter(file => path.extname(file) === '.js');
+      // 过滤出 .js 文件，排除 index.js
+      const jsFiles = files.filter(file => 
+        path.extname(file) === '.js' && file !== 'index.js'
+      );
       
       // 处理爬虫文件，获取爬虫信息
       const fileSpiderConfigs = jsFiles.map((file, index) => {
@@ -315,7 +317,7 @@ router.get('/script/:site', authenticateToken, async (req, res) => {
     let targetFile = null;
     
     for (const file of files) {
-      if (path.extname(file) === '.js') {
+      if (path.extname(file) === '.js' && file !== 'index.js') {
         const filePath = path.join(spiderDir, file);
         try {
           const module = require(filePath);
@@ -359,7 +361,7 @@ router.post('/script', authenticateToken, async (req, res) => {
     let targetFile = null;
     
     for (const file of files) {
-      if (path.extname(file) === '.js') {
+      if (path.extname(file) === '.js' && file !== 'index.js') {
         const filePath = path.join(spiderDir, file);
         try {
           const module = require(filePath);
