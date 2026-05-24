@@ -423,7 +423,6 @@ const ConsoleLogger = {
         const container = document.createElement('div');
         container.id = 'api-status-indicator';
         container.className = 'sa-status online';
-        container.style.cursor = 'pointer';
         container.innerHTML = '<span class="sa-status-dot"></span><span class="sa-status-text">后端连接正常</span>';
         return container;
     }
@@ -440,27 +439,7 @@ const ConsoleLogger = {
             indicator.innerHTML = '<span class="sa-status-dot"></span><span class="sa-status-text">后端连接正常</span>';
         } else {
             indicator.className = 'sa-status offline';
-            indicator.innerHTML = '<span class="sa-status-dot"></span><span class="sa-status-text">点击重新连接</span>';
-        }
-    }
-
-    // 重新连接后端
-    async function reconnectBackend() {
-        const indicator = document.getElementById('api-status-indicator');
-        if (!indicator) return;
-        
-        // 显示连接中状态
-        indicator.className = 'sa-status';
-        indicator.innerHTML = '<span class="sa-status-dot" style="animation: sa-spin 0.8s linear infinite;"></span><span class="sa-status-text">正在连接...</span>';
-        
-        try {
-            // 尝试测试后端连接
-            await apiClient.checkExists('test');
-            updateStatusIndicator(true);
-            showToast('✅', '后端连接成功');
-        } catch {
-            updateStatusIndicator(false);
-            showToast('❌', '后端连接失败，请稍后重试');
+            indicator.innerHTML = '<span class="sa-status-dot"></span><span class="sa-status-text">后端连接失败</span>';
         }
     }
 
@@ -606,7 +585,7 @@ const ConsoleLogger = {
                     method: 'GET',
                     url: HOST + '/check_existence?pageHref=' + encodeURIComponent(pageHref),
                     headers: { 'Authorization': 'Bearer ' + TOKEN },
-                    timeout: 20000,
+                    timeout: 5000,
                     onload: response => {
                         updateStatusIndicator(true);
                         try {
@@ -618,10 +597,6 @@ const ConsoleLogger = {
                     onerror: () => {
                         updateStatusIndicator(false);
                         reject(new Error('网络错误'));
-                    },
-                    ontimeout: () => {
-                        updateStatusIndicator(false);
-                        reject(new Error('请求超时'));
                     }
                 });
             });
@@ -636,7 +611,7 @@ const ConsoleLogger = {
                         'Content-Type': 'application/json',
                         'Authorization': 'Bearer ' + TOKEN
                     },
-                    timeout: 20000,
+                    timeout: 10000,
                     data: JSON.stringify(data),
                     onload: response => {
                         updateStatusIndicator(true);
@@ -645,10 +620,6 @@ const ConsoleLogger = {
                     onerror: () => {
                         updateStatusIndicator(false);
                         reject(new Error('网络错误'));
-                    },
-                    ontimeout: () => {
-                        updateStatusIndicator(false);
-                        reject(new Error('请求超时'));
                     }
                 });
             });
@@ -663,7 +634,7 @@ const ConsoleLogger = {
                         'Content-Type': 'application/json',
                         'Authorization': 'Bearer ' + TOKEN
                     },
-                    timeout: 20000,
+                    timeout: 5000,
                     data: JSON.stringify({ pageHref: encodeURIComponent(pageHref) }),
                     onload: response => {
                         updateStatusIndicator(true);
@@ -672,10 +643,6 @@ const ConsoleLogger = {
                     onerror: () => {
                         updateStatusIndicator(false);
                         reject(new Error('网络错误'));
-                    },
-                    ontimeout: () => {
-                        updateStatusIndicator(false);
-                        reject(new Error('请求超时'));
                     }
                 });
             });
@@ -690,7 +657,7 @@ const ConsoleLogger = {
                         'Content-Type': 'application/json',
                         'Authorization': 'Bearer ' + TOKEN
                     },
-                    timeout: 20000,
+                    timeout: 5000,
                     data: JSON.stringify(data),
                     onload: response => {
                         updateStatusIndicator(true);
@@ -699,10 +666,6 @@ const ConsoleLogger = {
                     onerror: () => {
                         updateStatusIndicator(false);
                         reject(new Error('网络错误'));
-                    },
-                    ontimeout: () => {
-                        updateStatusIndicator(false);
-                        reject(new Error('请求超时'));
                     }
                 });
             });
@@ -887,7 +850,6 @@ const ConsoleLogger = {
         deleteBtn.style.display = 'none';
 
         trigger.addEventListener('click', () => toggleSidebar());
-        statusIndicator.addEventListener('click', reconnectBackend);
 
         // 异步检查后端状态
         checkBackendStatus(pageInfo, uploadBtn, deleteBtn, starRating);
