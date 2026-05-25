@@ -1076,7 +1076,7 @@ router.get('/system/git/status', authenticateToken, verifyAdmin, async (req, res
     
     const { execSync } = require('child_process');
     
-    const status = execSync('git status --porcelain', { cwd: targetDir, encoding: 'utf-8' });
+    const status = execSync('git -c core.quotepath=false status --porcelain', { cwd: targetDir, encoding: 'utf-8' });
     
     const branch = execSync('git branch --show-current', { cwd: targetDir, encoding: 'utf-8' }).trim();
     
@@ -1242,7 +1242,7 @@ router.post('/system/git/remote', authenticateToken, verifyAdmin, async (req, re
 // 推送到远程仓库
 router.post('/system/git/push', authenticateToken, verifyAdmin, async (req, res) => {
   try {
-    const { type } = req.body;
+    const { type, force = false } = req.body;
     const rootDir = path.join(__dirname, '..', '..');
     const targetDir = type === 'frontend' 
       ? path.join(rootDir, '..', 'frontend') 
@@ -1269,11 +1269,54 @@ router.post('/system/git/push', authenticateToken, verifyAdmin, async (req, res)
       execSync(`git checkout -b ${branch}`, { cwd: targetDir });
     }
     
-    execSync(`git push -u origin ${branch}`, { cwd: targetDir });
+    let pushCommand = `git push`;
+    if (force) {
+      pushCommand += ' -f';
+    }
+    pushCommand += ` -u origin ${branch}`;
+    
+    try {
+      execSync(pushCommand, { cwd: targetDir });
+    } catch (error) {
+      let errorMsg = error.message;
+      
+      // 尝试更友好的错误提示
+      if (errorMsg.includes('rejected')) {
+        if (errorMsg.includes('non-fast-forward')) {
+          return res.status(400).json({ 
+            success: false, 
+            message: '推送被拒绝：远程仓库有新的提交，请先拉取（pull）后再推送',
+            suggestion: '建议先执行拉取操作'
+          });
+        }
+        if (errorMsg.includes('permission denied')) {
+          return res.status(400).json({ 
+            success: false, 
+            message: '推送被拒绝：没有权限推送到此仓库',
+            suggestion: '请检查远程仓库地址和权限'
+          });
+        }
+      }
+      
+      if (errorMsg.includes('secret') || errorMsg.includes('token') || errorMsg.includes('credential')) {
+        return res.status(400).json({ 
+          success: false, 
+          message: '推送失败：认证问题，请检查Git凭证配置',
+          suggestion: '请确保您有正确的访问权限'
+        });
+      }
+      
+      throw error;
+    }
     
     res.status(200).json({ success: true, message: '推送成功' });
   } catch (error) {
-    res.status(500).json({ success: false, message: '推送失败', error: error.message });
+    console.error('Git push error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: '推送失败：' + (error.stderr || error.message),
+      error: error.message 
+    });
   }
 });
 
@@ -1607,6 +1650,184 @@ router.delete('/system/backup-records/batch-delete', authenticateToken, verifyAd
     });
   } catch (error) {
     res.status(500).json({ message: '删除备份记录失败', error: error.message });
+  }
+});
+
+// 比较本地与远程仓库差异
+// 获取远程仓库文件列表
+router.get('/system/git/remote-files', authenticateToken, verifyAdmin, async (req, res) => {
+  try {
+    const { type } = req.query;
+    const rootDir = path.join(__dirname, '..', '..');
+    const targetDir = type === 'frontend' 
+      ? path.join(rootDir, '..', 'frontend') 
+      : rootDir;
+    
+    if (!checkGitInitialized(targetDir)) {
+      return res.status(400).json({ success: false, message: 'Git 仓库未初始化' });
+    }
+    
+    const { execSync } = require('child_process');
+    
+    let hasOrigin = false;
+    try {
+      execSync('git remote get-url origin', { cwd: targetDir });
+      hasOrigin = true;
+    } catch (error) {
+      return res.status(400).json({ success: false, message: '请先设置远程仓库' });
+    }
+    
+    let branch = execSync('git branch --show-current', { cwd: targetDir, encoding: 'utf-8' }).trim();
+    if (!branch) {
+      branch = 'main';
+    }
+    
+    try {
+      execSync('git fetch origin', { cwd: targetDir, timeout: 30000 });
+    } catch (e) {
+      console.log('Fetch remote failed:', e.message);
+    }
+    
+    const files = [];
+    
+    try {
+      // 使用 ls-tree -l 获取文件大小
+      const output = execSync(`git -c core.quotepath=false ls-tree -r -l origin/${branch}`, { cwd: targetDir, encoding: 'utf-8' }).trim();
+      if (output) {
+        const lines = output.split('\n');
+        for (const line of lines) {
+          if (line.trim()) {
+            // 格式: <mode> <type> <object> <size> <path>
+            const parts = line.trim().split(/\s+/);
+            if (parts.length >= 5) {
+              const filePath = parts[4].replace(/\//g, '\\');
+              const size = parseInt(parts[3], 10) || 0;
+              files.push({
+                path: filePath,
+                type: 'file',
+                size: size
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.log('Get remote files failed:', e.message);
+    }
+    
+    res.status(200).json({ 
+      success: true, 
+      files: files,
+      branch: branch
+    });
+  } catch (error) {
+    console.error('Get remote files error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: '获取远程文件失败', 
+      error: error.message 
+    });
+  }
+});
+
+router.get('/system/git/compare-remote', authenticateToken, verifyAdmin, async (req, res) => {
+  try {
+    const { type } = req.query;
+    const rootDir = path.join(__dirname, '..', '..');
+    const targetDir = type === 'frontend' 
+      ? path.join(rootDir, '..', 'frontend') 
+      : rootDir;
+    
+    if (!checkGitInitialized(targetDir)) {
+      return res.status(400).json({ success: false, message: 'Git 仓库未初始化' });
+    }
+    
+    const { execSync } = require('child_process');
+    
+    let hasOrigin = false;
+    try {
+      execSync('git remote get-url origin', { cwd: targetDir });
+      hasOrigin = true;
+    } catch (error) {
+      return res.status(400).json({ success: false, message: '请先设置远程仓库' });
+    }
+    
+    let branch = execSync('git branch --show-current', { cwd: targetDir, encoding: 'utf-8' }).trim();
+    if (!branch) {
+      branch = 'main';
+    }
+    
+    try {
+      // 先获取最新的远程状态
+      execSync('git fetch origin', { cwd: targetDir, timeout: 30000 });
+    } catch (e) {
+      // fetch 失败也继续尝试比较
+      console.log('Fetch remote failed:', e.message);
+    }
+    
+    let diffStatus = '';
+    
+    // 获取本地有但远程没有的文件（新增文件）
+    try {
+      const localFiles = execSync('git ls-files', { cwd: targetDir, encoding: 'utf-8' }).trim().split('\n').filter(Boolean);
+      const remoteFiles = execSync(`git ls-tree --name-only -r origin/${branch} 2>/dev/null || echo ''`, { cwd: targetDir, encoding: 'utf-8' }).trim().split('\n').filter(Boolean);
+      
+      const localSet = new Set(localFiles);
+      const remoteSet = new Set(remoteFiles);
+      
+      // 本地有但远程没有的文件
+      for (const file of localFiles) {
+        if (!remoteSet.has(file)) {
+          diffStatus += `A  ${file}\n`;
+        }
+      }
+      
+      // 远程有但本地没有的文件
+      for (const file of remoteFiles) {
+        if (!localSet.has(file)) {
+          diffStatus += `D  ${file}\n`;
+        }
+      }
+    } catch (e) {
+      // 如果上面方法失败，尝试用 git diff
+    }
+    
+    // 尝试获取修改过的文件
+    try {
+      const changes = execSync(`git diff --name-status origin/${branch}..HEAD 2>/dev/null || git diff --name-status HEAD 2>/dev/null || echo ''`, { cwd: targetDir, encoding: 'utf-8' }).trim();
+      if (changes) {
+        if (diffStatus) {
+          diffStatus += '\n' + changes;
+        } else {
+          diffStatus = changes;
+        }
+      }
+    } catch (e) {
+      console.log('Git diff failed:', e.message);
+    }
+    
+    // 如果没有获取到差异，尝试用 git status 并与远程对比
+    if (!diffStatus) {
+      try {
+        const status = execSync('git status --porcelain', { cwd: targetDir, encoding: 'utf-8' }).trim();
+        diffStatus = status;
+      } catch (e) {
+        // 如果还是失败，返回空
+      }
+    }
+    
+    res.status(200).json({ 
+      success: true, 
+      status: diffStatus,
+      branch: branch
+    });
+  } catch (error) {
+    console.error('Git compare remote error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: '比较失败', 
+      error: error.message 
+    });
   }
 });
 
