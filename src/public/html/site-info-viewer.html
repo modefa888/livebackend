@@ -13,9 +13,10 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
             min-height: 100vh;
             padding: 20px;
+            background-attachment: fixed;
         }
 
         .container {
@@ -27,19 +28,22 @@
         .header {
             text-align: center;
             color: white;
-            margin-bottom: 30px;
+            margin-bottom: 35px;
             position: relative;
         }
 
         .header h1 {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+            font-size: 2.8rem;
+            margin-bottom: 12px;
+            text-shadow: 2px 2px 8px rgba(0,0,0,0.25);
+            font-weight: 700;
+            letter-spacing: 2px;
         }
 
         .header p {
-            font-size: 1.1rem;
-            opacity: 0.9;
+            font-size: 1.15rem;
+            opacity: 0.95;
+            font-weight: 300;
         }
 
         .settings-btn {
@@ -47,59 +51,75 @@
             right: 0;
             top: 50%;
             transform: translateY(-50%);
-            width: 48px;
-            height: 48px;
-            background: white;
+            width: 52px;
+            height: 52px;
+            background: rgba(255,255,255,0.95);
             border: none;
             border-radius: 50%;
             cursor: pointer;
-            font-size: 1.5rem;
+            font-size: 1.6rem;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+            transition: transform 0.25s, box-shadow 0.25s;
         }
 
         .settings-btn:hover {
             transform: translateY(-50%) scale(1.1);
-            box-shadow: 0 8px 12px rgba(0,0,0,0.2);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.25);
         }
 
         .dropdown-menu {
             position: absolute;
-            top: 60px;
+            top: 65px;
             right: 0;
             background: white;
-            border-radius: 12px;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
-            padding: 10px 0;
-            min-width: 200px;
+            border-radius: 16px;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.2);
+            padding: 12px 0;
+            min-width: 220px;
             z-index: 100;
             display: none;
+            backdrop-filter: blur(10px);
         }
 
         .dropdown-menu.active {
             display: block;
+            animation: slideDown 0.2s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .dropdown-item {
-            padding: 12px 20px;
+            padding: 14px 24px;
             cursor: pointer;
             display: flex;
             align-items: center;
-            gap: 10px;
-            transition: background 0.2s;
+            gap: 12px;
+            transition: background 0.2s, padding-left 0.2s;
             color: #1a1a2e;
+            font-size: 0.95rem;
         }
 
         .dropdown-item:hover {
             background: #f3f4f6;
+            padding-left: 28px;
         }
 
         .dropdown-item.active {
             background: #e0e7ff;
             color: #667eea;
+            font-weight: 600;
         }
 
         .dropdown-item.active::after {
@@ -111,7 +131,7 @@
         .dropdown-divider {
             height: 1px;
             background: #e5e7eb;
-            margin: 5px 0;
+            margin: 8px 0;
         }
 
         .controls {
@@ -119,29 +139,30 @@
             gap: 15px;
             justify-content: center;
             align-items: center;
-            margin-bottom: 30px;
+            margin-bottom: 35px;
             flex-wrap: wrap;
         }
 
         .control-btn {
-            padding: 10px 20px;
+            padding: 12px 24px;
             background: white;
             color: #667eea;
             border: none;
-            border-radius: 8px;
-            font-size: 0.95rem;
+            border-radius: 12px;
+            font-size: 1rem;
             cursor: pointer;
             font-weight: 600;
             transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
 
         .control-btn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
         }
 
         .control-btn.active {
-            background: #667eea;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
         }
 
@@ -149,57 +170,67 @@
             display: flex;
             gap: 20px;
             justify-content: center;
-            margin-bottom: 25px;
+            margin-bottom: 30px;
             flex-wrap: wrap;
         }
 
         .stat-card {
-            background: white;
-            padding: 18px 35px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            background: rgba(255,255,255,0.95);
+            padding: 20px 40px;
+            border-radius: 16px;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.1);
             text-align: center;
+            backdrop-filter: blur(10px);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
         }
 
         .stat-card .number {
-            font-size: 1.8rem;
+            font-size: 2rem;
             font-weight: bold;
-            color: #667eea;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
         .stat-card .label {
             color: #666;
-            margin-top: 5px;
-            font-size: 0.9rem;
+            margin-top: 8px;
+            font-size: 0.95rem;
         }
 
         /* 卡片视图 */
         .card-view {
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 18px;
         }
 
         .card {
             background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 16px;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.1);
             overflow: hidden;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: transform 0.3s, box-shadow 0.3s;
         }
 
         .card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 12px rgba(0,0,0,0.15);
+            transform: translateY(-3px);
+            box-shadow: 0 12px 25px rgba(0,0,0,0.15);
         }
 
         .card-header {
-            padding: 20px;
+            padding: 22px;
             cursor: pointer;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
             user-select: none;
         }
 
@@ -211,32 +242,45 @@
             flex: 1;
             display: flex;
             align-items: center;
-            gap: 15px;
+            gap: 18px;
         }
 
         .thumbnail {
-            width: 60px;
-            height: 60px;
-            border-radius: 8px;
-            object-fit: cover;
-            background: #e0e7ff;
+            width: 64px;
+            height: 64px;
+            border-radius: 12px;
+            object-fit: contain;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
 
         .title-info h3 {
-            font-size: 1.1rem;
+            font-size: 1.2rem;
             color: #1a1a2e;
-            margin-bottom: 5px;
+            margin-bottom: 6px;
+            font-weight: 600;
         }
 
         .title-info .meta {
             color: #666;
             font-size: 0.9rem;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
         }
 
         .toggle-icon {
-            font-size: 1.5rem;
+            font-size: 1.6rem;
             color: #667eea;
-            transition: transform 0.3s;
+            transition: transform 0.35s;
         }
 
         .card.active .toggle-icon {
@@ -246,7 +290,7 @@
         .card-content {
             max-height: 0;
             overflow: hidden;
-            transition: max-height 0.3s ease-out;
+            transition: max-height 0.4s ease-out;
             background: white;
         }
 
@@ -255,66 +299,68 @@
         }
 
         .content-inner {
-            padding: 20px;
+            padding: 24px;
         }
 
         .info-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 20px;
-            margin-bottom: 20px;
+            margin-bottom: 24px;
         }
 
         .info-item {
             background: #f8fafc;
-            padding: 15px;
-            border-radius: 8px;
-            border-left: 4px solid #667eea;
+            padding: 18px;
+            border-radius: 12px;
+            border-left: 5px solid #667eea;
         }
 
         .info-item .label {
             font-weight: 600;
             color: #374151;
-            margin-bottom: 5px;
+            margin-bottom: 6px;
             font-size: 0.9rem;
         }
 
         .info-item .value {
             color: #667eea;
             word-break: break-all;
+            font-size: 0.95rem;
         }
 
         .m3u8-section {
-            margin-top: 20px;
+            margin-top: 24px;
         }
 
         .m3u8-title {
             font-weight: 600;
             color: #1a1a2e;
-            margin-bottom: 15px;
-            font-size: 1.1rem;
+            margin-bottom: 18px;
+            font-size: 1.15rem;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
         }
 
         .m3u8-list {
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 12px;
         }
 
         .m3u8-item {
             background: #f0f9ff;
-            padding: 15px;
-            border-radius: 8px;
+            padding: 18px;
+            border-radius: 12px;
             border: 1px solid #bae6fd;
         }
 
         .m3u8-item .name {
             font-weight: 600;
             color: #0369a1;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
+            font-size: 1rem;
         }
 
         .m3u8-item .url {
@@ -322,10 +368,11 @@
             color: #0284c7;
             word-break: break-all;
             text-decoration: none;
-            padding: 8px;
+            padding: 10px;
             background: white;
-            border-radius: 4px;
+            border-radius: 8px;
             font-size: 0.9rem;
+            transition: background 0.2s;
         }
 
         .m3u8-item .url:hover {
@@ -333,58 +380,71 @@
         }
 
         .m3u8-item .copy-btn {
-            margin-top: 10px;
-            padding: 6px 12px;
-            background: #667eea;
+            margin-top: 12px;
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 0.85rem;
-            transition: background 0.2s;
+            font-size: 0.9rem;
+            transition: transform 0.2s, box-shadow 0.2s;
         }
 
         .m3u8-item .copy-btn:hover {
-            background: #5a67d8;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
         }
 
         /* 图片墙视图 */
         .wall-view {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 22px;
         }
 
         .wall-card {
             background: white;
-            border-radius: 12px;
+            border-radius: 16px;
             overflow: hidden;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            box-shadow: 0 6px 15px rgba(0,0,0,0.1);
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: transform 0.3s, box-shadow 0.3s;
         }
 
         .wall-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 12px 20px rgba(0,0,0,0.2);
+            transform: translateY(-6px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.2);
+        }
+
+        .wall-image-container {
+            width: 100%;
+            height: 200px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
         }
 
         .wall-image {
-            width: 100%;
-            height: 180px;
-            object-fit: cover;
+            height: 100%;
+            width: auto;
+            object-fit: contain;
+            max-width: 100%;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
 
         .wall-content {
-            padding: 15px;
+            padding: 18px;
         }
 
         .wall-title {
-            font-size: 1rem;
+            font-size: 1.05rem;
             font-weight: 600;
             color: #1a1a2e;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
@@ -392,15 +452,16 @@
 
         .wall-meta {
             display: flex;
-            gap: 10px;
+            gap: 12px;
             flex-wrap: wrap;
         }
 
         .tag {
             display: inline-block;
-            padding: 4px 10px;
+            padding: 5px 12px;
             border-radius: 20px;
-            font-size: 0.8rem;
+            font-size: 0.85rem;
+            font-weight: 500;
         }
 
         .tag-stars {
@@ -426,30 +487,31 @@
         /* 分页 */
         .pagination {
             display: flex;
-            gap: 10px;
+            gap: 12px;
             justify-content: center;
-            margin-top: 40px;
+            margin-top: 50px;
             flex-wrap: wrap;
         }
 
         .page-btn {
-            padding: 10px 18px;
-            background: white;
+            padding: 12px 22px;
+            background: rgba(255,255,255,0.95);
             color: #667eea;
             border: none;
-            border-radius: 8px;
+            border-radius: 10px;
             cursor: pointer;
             font-weight: 600;
             transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
 
         .page-btn:hover:not(:disabled) {
-            transform: scale(1.05);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
         }
 
         .page-btn.active {
-            background: #667eea;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
         }
 
@@ -461,7 +523,7 @@
         /* 加载和空状态 */
         .loading {
             text-align: center;
-            padding: 40px;
+            padding: 60px;
             color: white;
         }
 
@@ -469,10 +531,10 @@
             border: 4px solid rgba(255,255,255,0.3);
             border-top: 4px solid white;
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
+            width: 50px;
+            height: 50px;
             animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
+            margin: 0 auto 25px;
         }
 
         @keyframes spin {
@@ -482,13 +544,18 @@
 
         .empty-state {
             text-align: center;
-            padding: 60px 20px;
+            padding: 80px 20px;
             color: white;
         }
 
         .empty-state .icon {
-            font-size: 4rem;
-            margin-bottom: 20px;
+            font-size: 5rem;
+            margin-bottom: 25px;
+        }
+
+        .empty-state h2 {
+            font-size: 1.8rem;
+            margin-bottom: 12px;
         }
 
         /* 弹窗 */
@@ -504,77 +571,106 @@
             align-items: center;
             z-index: 1000;
             padding: 20px;
+            backdrop-filter: blur(5px);
         }
 
         .modal-overlay.active {
             display: flex;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
         .modal {
             background: white;
-            border-radius: 16px;
-            max-width: 900px;
+            border-radius: 20px;
+            max-width: 950px;
             width: 100%;
             max-height: 90vh;
             overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .modal-header {
-            padding: 25px;
+            padding: 28px;
             border-bottom: 1px solid #e5e7eb;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            position: sticky;
+            top: 0;
+            background: white;
         }
 
         .modal-header h2 {
             color: #1a1a2e;
+            font-size: 1.4rem;
         }
 
         .close-btn {
             background: none;
             border: none;
-            font-size: 2rem;
+            font-size: 2.2rem;
             cursor: pointer;
             color: #666;
-            transition: color 0.2s;
+            transition: color 0.2s, transform 0.2s;
+            line-height: 1;
         }
 
         .close-btn:hover {
             color: #000;
+            transform: rotate(90deg);
         }
 
         .modal-body {
-            padding: 25px;
+            padding: 30px;
         }
 
         .detail-header {
             display: flex;
-            gap: 25px;
-            margin-bottom: 30px;
+            gap: 30px;
+            margin-bottom: 35px;
         }
 
         .detail-cover {
             flex-shrink: 0;
-            width: 240px;
-            height: 160px;
-            border-radius: 12px;
+            width: 260px;
+            height: 180px;
+            border-radius: 16px;
             overflow: hidden;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             display: flex;
             align-items: center;
             justify-content: center;
+            position: relative;
         }
 
         .detail-cover img {
-            width: 100%;
             height: 100%;
-            object-fit: cover;
+            width: auto;
+            object-fit: contain;
+            max-width: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
 
         .detail-cover-placeholder {
             color: white;
-            font-size: 4rem;
+            font-size: 5rem;
         }
 
         .detail-info {
@@ -582,35 +678,36 @@
         }
 
         .detail-title {
-            font-size: 1.3rem;
+            font-size: 1.5rem;
             font-weight: bold;
             color: #1a1a2e;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
             line-height: 1.4;
         }
 
         .detail-meta {
             display: flex;
-            gap: 20px;
+            gap: 25px;
             flex-wrap: wrap;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
         }
 
         .detail-meta-item {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
             color: #666;
+            font-size: 1rem;
         }
 
         .detail-link {
             display: block;
-            padding: 12px 20px;
+            padding: 14px 24px;
             background: #f3f4f6;
-            border-radius: 8px;
+            border-radius: 10px;
             color: #667eea;
             text-decoration: none;
-            font-size: 0.9rem;
+            font-size: 0.95rem;
             word-break: break-all;
             transition: background 0.2s;
         }
@@ -620,32 +717,38 @@
         }
 
         .detail-section {
-            margin-top: 30px;
+            margin-top: 35px;
         }
 
         .detail-section-title {
-            font-size: 1.1rem;
+            font-size: 1.2rem;
             font-weight: bold;
             color: #1a1a2e;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #e5e7eb;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 3px solid #e5e7eb;
         }
 
         .play-list {
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 15px;
         }
 
         .play-item {
             display: flex;
             align-items: center;
-            gap: 15px;
-            padding: 15px;
+            gap: 20px;
+            padding: 18px;
             background: #f8fafc;
-            border-radius: 10px;
-            border-left: 4px solid #667eea;
+            border-radius: 12px;
+            border-left: 5px solid #667eea;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .play-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
 
         .play-name {
@@ -666,23 +769,24 @@
 
         .play-actions {
             display: flex;
-            gap: 8px;
+            gap: 10px;
             flex-shrink: 0;
         }
 
         .play-btn {
-            padding: 8px 16px;
-            background: #667eea;
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 0.85rem;
-            transition: background 0.2s;
+            font-size: 0.9rem;
+            transition: transform 0.2s, box-shadow 0.2s;
         }
 
         .play-btn:hover {
-            background: #5a67d8;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
         }
 
         .play-btn.secondary {
@@ -693,6 +797,52 @@
         .play-btn.secondary:hover {
             background: #e5e7eb;
         }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .header p {
+                font-size: 1rem;
+            }
+
+            .settings-btn {
+                width: 44px;
+                height: 44px;
+                font-size: 1.3rem;
+            }
+
+            .wall-view {
+                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+                gap: 15px;
+            }
+
+            .wall-image-container {
+                height: 160px;
+            }
+
+            .detail-header {
+                flex-direction: column;
+                gap: 20px;
+            }
+
+            .detail-cover {
+                width: 100%;
+                height: 200px;
+            }
+
+            .play-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .play-actions {
+                width: 100%;
+                justify-content: flex-end;
+            }
+        }
     </style>
 </head>
 <body>
@@ -701,10 +851,8 @@
             <h1>🎬 站点信息查看器</h1>
             <p>浏览和查看所有保存的站点信息 <span id="totalCount" style="font-weight: bold; margin-left: 8px;"></span></p>
             
-            <!-- 设置按钮 -->
             <button class="settings-btn" onclick="toggleSettingsMenu()">⚙️</button>
             
-            <!-- 设置下拉菜单 -->
             <div id="settingsMenu" class="dropdown-menu">
                 <div class="dropdown-item active" onclick="setView('card')">📋 卡片视图</div>
                 <div class="dropdown-item" onclick="setView('wall')">🖼️ 图片墙</div>
@@ -716,7 +864,6 @@
         <div id="pagination" class="pagination"></div>
     </div>
 
-    <!-- 详情弹窗 -->
     <div id="modal" class="modal-overlay" onclick="closeModal(event)">
         <div class="modal" onclick="event.stopPropagation()">
             <div class="modal-header">
@@ -735,10 +882,11 @@
         let totalPages = 1;
         let totalCount = 0;
 
+        let currentData = [];
+
         async function loadData(page = 1) {
             currentPage = page;
             const contentEl = document.getElementById('content');
-            const statsEl = document.getElementById('stats');
             const paginationEl = document.getElementById('pagination');
             
             contentEl.innerHTML = '<div class="loading"><div class="spinner"></div><p>正在加载数据...</p></div>';
@@ -750,6 +898,7 @@
                 if (result.code === 200 && result.data) {
                     totalPages = result.total_pages;
                     totalCount = result.total_count;
+                    currentData = result.data;
                     renderData(result.data);
                     renderPagination();
                 } else {
@@ -785,17 +934,19 @@
                 <div class="card" id="card-${index}">
                     <div class="card-header" onclick="openItemModal(${index})">
                         <div class="card-title">
-                            <img src="${item.page_img || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2260%22 height=%2260%22 viewBox=%220 0 24 24%22 fill=%22%23c3cfe2%22%3E%3Cpath d=%22M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z%22/%3E%3C/svg%3E'}" class="thumbnail" alt="" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2260%22 height=%2260%22 viewBox=%220 0 24 24%22 fill=%22%23c3cfe2%22%3E%3Cpath d=%22M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z%22/%3E%3C/svg%3E'">
+                            <div class="thumbnail">
+                                <img src="${item.page_img || ''}" alt="" onerror="this.style.display='none'; this.parentElement.style.background='linear-gradient(135deg, #667eea 0%, #764ba2 100%)'; this.parentElement.innerHTML='<span style=\\'font-size:2rem;color:white\\'>🎬</span>';">
+                            </div>
                             <div class="title-info">
                                 <h3>${escapeHtml(item.page_title)}</h3>
                                 <div class="meta">
                                     ${item.stars ? `<span class="tag tag-stars">⭐ ${item.stars}</span>` : ''}
                                     ${item.view_count ? `<span class="tag tag-views">👁 ${item.view_count}</span>` : ''}
-                                    ${item.create_time ? `<span class="tag tag-date">${new Date(item.create_time).toLocaleDateString()}</span>` : ''}
+                                    ${item.create_time ? `<span class="tag tag-date">📅 ${new Date(item.create_time).toLocaleDateString()}</span>` : ''}
                                 </div>
                             </div>
                         </div>
-                        <div class="toggle-icon">▶</div>
+                        <div class="toggle-icon">▼</div>
                     </div>
                 </div>
             `).join('');
@@ -805,7 +956,9 @@
             container.className = 'wall-view';
             container.innerHTML = data.map((item, index) => `
                 <div class="wall-card" onclick="openItemModal(${index})">
-                    <img src="${item.page_img || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22200%22 viewBox=%220 0 24 24%22 fill=%22%23667eea%22%3E%3Cpath d=%22M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z%22/%3E%3C/svg%3E'}" class="wall-image" alt="" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22200%22 viewBox=%220 0 24 24%22 fill=%22%23667eea%22%3E%3Cpath d=%22M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z%22/%3E%3C/svg%3E'">
+                    <div class="wall-image-container">
+                        <img src="${item.page_img || ''}" class="wall-image" alt="" onerror="this.style.display='none'; this.parentElement.innerHTML='<span style=\\'font-size:3rem;color:white\\'>🎬</span>';">
+                    </div>
                     <div class="wall-content">
                         <div class="wall-title" title="${escapeHtml(item.page_title)}">${escapeHtml(item.page_title)}</div>
                         <div class="wall-meta">
@@ -857,7 +1010,6 @@
             menu.classList.toggle('active');
         }
 
-        // 点击其他地方关闭菜单
         document.addEventListener('click', function(event) {
             const settingsBtn = document.querySelector('.settings-btn');
             const menu = document.getElementById('settingsMenu');
@@ -884,35 +1036,6 @@
             loadData(currentPage);
         }
 
-        let currentData = [];
-
-        async function loadData(page = 1) {
-            currentPage = page;
-            const contentEl = document.getElementById('content');
-            const statsEl = document.getElementById('stats');
-            const paginationEl = document.getElementById('pagination');
-            
-            contentEl.innerHTML = '<div class="loading"><div class="spinner"></div><p>正在加载数据...</p></div>';
-            
-            try {
-                const response = await fetch(`${API_URL}?page=${page}&page_size=${pageSize}`);
-                const result = await response.json();
-                
-                if (result.code === 200 && result.data) {
-                    totalPages = result.total_pages;
-                    totalCount = result.total_count;
-                    currentData = result.data;
-                    renderData(result.data);
-                    renderPagination();
-                } else {
-                    contentEl.innerHTML = '<div class="empty-state"><div class="icon">😔</div><h2>数据加载失败</h2><p>' + (result.message || '请稍后重试') + '</p></div>';
-                }
-            } catch (error) {
-                console.error('加载数据失败:', error);
-                contentEl.innerHTML = '<div class="empty-state"><div class="icon">❌</div><h2>网络错误</h2><p>无法连接到服务器，请稍后重试</p></div>';
-            }
-        }
-
         function openItemModal(index) {
             const item = currentData[index];
             const modal = document.getElementById('modal');
@@ -924,7 +1047,7 @@
                 <div class="detail-header">
                     <div class="detail-cover">
                         ${item.page_img ? 
-                            `<img src="${escapeHtml(item.page_img)}" alt="Cover" onerror="this.parentElement.innerHTML='<span class=\\'detail-cover-placeholder\\'>🎬</span>'">` :
+                            `<img src="${escapeHtml(item.page_img)}" alt="Cover" onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=\\'detail-cover-placeholder\\'>🎬</span>'">` :
                             `<span class="detail-cover-placeholder">🎬</span>`
                         }
                     </div>
@@ -932,9 +1055,9 @@
                         <div class="detail-title">${escapeHtml(item.page_title)}</div>
                         <div class="detail-meta">
                             <span class="detail-meta-item">
-                                👁 ${item.view_count || 0}
+                                👁 ${item.view_count || 0} 次浏览
                             </span>
-                            ${item.stars ? `<span class="detail-meta-item">⭐ ${item.stars}</span>` : ''}
+                            ${item.stars ? `<span class="detail-meta-item">⭐ ${item.stars} 评分</span>` : ''}
                             ${item.create_time ? `<span class="detail-meta-item">📅 ${new Date(item.create_time).toLocaleDateString()}</span>` : ''}
                         </div>
                         <a href="${escapeHtml(item.page_href)}" target="_blank" class="detail-link">
@@ -960,8 +1083,6 @@
                     </div>
                 </div>
                 ` : ''}
-
-
             `;
 
             modal.classList.add('active');
@@ -988,7 +1109,6 @@
             return div.innerHTML;
         }
 
-        // 键盘事件
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 closeModal();
