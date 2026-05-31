@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
+const { logOperation } = require('./operation-logs');
 const crypto = require('crypto');
 
 // 加密/解密配置 - 与Python代码保持一致
@@ -65,6 +66,14 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
+// 中间件：验证管理员权限
+const verifyAdmin = async (req, res, next) => {
+  if (req.user.permissionLevel !== 2 && req.user.permissionLevel !== 3) {
+    return res.status(403).json({ message: '权限不足' });
+  }
+  next();
+};
+
 // 保存数据
 router.post('/save-data', authenticateToken, async (req, res) => {
   try {
@@ -93,6 +102,8 @@ router.post('/save-data', authenticateToken, async (req, res) => {
       'INSERT INTO site_info (page_title, page_href, page_img, m3u8_list) VALUES (?, ?, ?, ?)',
       [encrypted_page_title, encrypted_page_href, encrypted_page_img, encrypted_m3u8_list]
     );
+
+    await logOperation(req, 'add', '网站信息', 0, pageTitle, `添加网站信息: ${pageTitle}`);
 
     res.status(200).json({ message: '数据保存成功' });
   } catch (error) {
@@ -163,31 +174,25 @@ router.get('/query-data-by-page', authenticateToken, async (req, res) => {
   }
 });
 
-// 根据ID删除数据
-router.delete('/delete-data', authenticateToken, async (req, res) => {
+// 删除网站信息
+router.delete('/:id', authenticateToken, verifyAdmin, async (req, res) => {
   try {
-    const { id } = req.body;
+    const { id } = req.params;
 
-    if (!id) {
-      return res.status(400).json({
-        code: 400,
-        message: '缺少必要参数id，请提供要删除的数据的id'
-      });
+    const [info] = await db.execute('SELECT site_key FROM site_info WHERE id = ?', [id]);
+    const siteKey = info.length > 0 ? info[0].site_key : `信息${id}`;
+
+    const [result] = await db.execute('DELETE FROM site_info WHERE id = ?', [id]);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: '网站信息不存在' });
     }
 
-    // 删除数据
-    await db.execute('DELETE FROM site_info WHERE id = ?', [id]);
+    await logOperation(req, 'delete', '网站信息', parseInt(id), siteKey, `删除网站信息: ${siteKey}`);
 
-    res.status(200).json({
-      code: 200,
-      message: '数据删除成功'
-    });
+    res.status(200).json({ success: true, message: '网站信息删除成功' });
   } catch (error) {
-    console.error('删除数据失败:', error);
-    res.status(500).json({
-      code: 500,
-      message: '数据删除失败'
-    });
+    res.status(500).json({ message: '删除网站信息失败', error: error.message });
   }
 });
 
@@ -352,6 +357,7 @@ router.post('/save_data', authenticateToken, async (req, res) => {
         'UPDATE site_info SET page_title = ?, page_img = ?, m3u8_list = ? WHERE page_href = ?',
         [encrypted_page_title, encrypted_page_img, encrypted_m3u8_list, encrypted_page_href]
       );
+      await logOperation(req, 'update', '网站信息', 0, pageTitle, `更新网站信息: ${pageTitle}`);
       return res.status(200).json({ message: '数据更新成功' });
     }
 
@@ -359,6 +365,8 @@ router.post('/save_data', authenticateToken, async (req, res) => {
       'INSERT INTO site_info (page_title, page_href, page_img, m3u8_list) VALUES (?, ?, ?, ?)',
       [encrypted_page_title, encrypted_page_href, encrypted_page_img, encrypted_m3u8_list]
     );
+
+    await logOperation(req, 'add', '网站信息', 0, pageTitle, `添加网站信息: ${pageTitle}`);
 
     res.status(200).json({ message: '数据保存成功' });
   } catch (error) {

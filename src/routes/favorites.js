@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const jwt = require('jsonwebtoken');
 const db = require('../config/db');
+const jwt = require('jsonwebtoken');
+const { logOperation } = require('./operation-logs');
 
 // 验证用户
 const authMiddleware = async (req, res, next) => {
@@ -193,6 +194,51 @@ router.delete('/:vod_id', async (req, res) => {
   } catch (error) {
     console.error('取消收藏失败:', error);
     res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+// 更新收藏
+router.put('/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, type, tags } = req.body;
+    const userId = req.user.id;
+
+    const updates = [];
+    const values = [];
+
+    if (title !== undefined) {
+      updates.push('title = ?');
+      values.push(title);
+    }
+    if (type !== undefined) {
+      updates.push('type = ?');
+      values.push(type);
+    }
+    if (tags !== undefined) {
+      updates.push('tags = ?');
+      values.push(tags);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ message: '没有可更新的字段' });
+    }
+
+    values.push(id, userId);
+    const [result] = await db.execute(
+      `UPDATE fabubot_favorites SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`,
+      values
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: '收藏不存在' });
+    }
+
+    await logOperation(req, 'update', '收藏', parseInt(id), title || `收藏${id}`, `更新收藏: ${title || `ID ${id}`}`);
+
+    res.status(200).json({ success: true, message: '收藏更新成功' });
+  } catch (error) {
+    res.status(500).json({ message: '更新收藏失败', error: error.message });
   }
 });
 

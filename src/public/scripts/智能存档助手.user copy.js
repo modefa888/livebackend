@@ -45,7 +45,7 @@ const ConsoleLogger = {
     error: '#F44336',
     info: '#2196F3',
     title: '#9C27B0',
-
+    
     log(title, data, type = 'info') {
         const colors = {
             success: this.success,
@@ -53,7 +53,7 @@ const ConsoleLogger = {
             error: this.error,
             info: this.info
         };
-
+        
         console.group('%c 📦 ' + title, 'color: ' + this.title + '; font-weight: bold; font-size: 14px;');
         if (typeof data === 'object' && data !== null) {
             for (const [key, value] of Object.entries(data)) {
@@ -68,19 +68,19 @@ const ConsoleLogger = {
         }
         console.groupEnd();
     },
-
+    
     logPageInfo(title, cover, m3u8List) {
         console.clear();
         console.log('%c ┌─────────────────────────────────────────────────────────┐', 'color: #607D8B;');
         console.log('%c │              🎯 智能存档助手 - 数据获取报告              │', 'color: #607D8B;');
         console.log('%c └─────────────────────────────────────────────────────────┘', 'color: #607D8B;');
         console.log('');
-
+        
         console.group('%c 📄 页面信息', 'color: #1976D2; font-weight: bold;');
         console.log('%c 标题:', 'color: #42A5F5; font-weight: 500;', title ? '%c ' + title : '%c ❌ 未获取到', title ? 'color: #4CAF50;' : 'color: #F44336;');
         console.log('%c URL:', 'color: #42A5F5; font-weight: 500;', '%c ' + window.location.href, 'color: #66BB6A;');
         console.groupEnd();
-
+        
         console.group('%c 🖼️ 封面信息', 'color: #1E88E5; font-weight: bold;');
         if (cover) {
             console.log('%c 封面地址:', 'color: #64B5F6; font-weight: 500;', cover);
@@ -92,7 +92,7 @@ const ConsoleLogger = {
             console.log('%c ❌ 封面地址: 未获取到', 'color: #EF5350; font-weight: 500;');
         }
         console.groupEnd();
-
+        
         console.group('%c 🎬 m3u8 地址列表', 'color: #00897B; font-weight: bold;');
         if (m3u8List && m3u8List.length > 0) {
             console.log('%c ✅ 成功捕获 ' + m3u8List.length + ' 条 m3u8 地址', 'color: #66BB6A; font-weight: 500;');
@@ -103,7 +103,7 @@ const ConsoleLogger = {
             console.log('%c ⏳ 等待捕获 m3u8 地址...', 'color: #FFA726; font-weight: 500;');
         }
         console.groupEnd();
-
+        
         console.log('');
         console.log('%c ┌─────────────────────────────────────────────────────────┐', 'color: #607D8B;');
         console.log('%c │              💡 提示: 点击左侧侧边栏保存数据             │', 'color: #607D8B;');
@@ -117,14 +117,14 @@ const ConsoleLogger = {
     // 注入美化样式
     function injectStyles() {
         if (document.getElementById('smart-archive-styles')) return;
-
+        
         const style = document.createElement('style');
         style.id = 'smart-archive-styles';
         style.textContent = `
             #smart-archive-sidebar {
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             }
-
+            
             #smart-archive-sidebar .sa-btn {
                 position: relative;
                 display: flex;
@@ -141,26 +141,26 @@ const ConsoleLogger = {
                 transition: all 0.3s ease;
                 overflow: hidden;
             }
-
+            
             #smart-archive-sidebar .sa-btn:hover {
                 transform: translateY(-2px);
                 box-shadow: 0 4px 12px rgba(0,0,0,0.2);
             }
-
+            
             #smart-archive-sidebar .sa-btn:active {
                 transform: translateY(0);
             }
-
+            
             #smart-archive-sidebar .sa-btn:disabled {
                 opacity: 0.6;
                 cursor: not-allowed;
                 transform: none !important;
             }
-
+            
             #smart-archive-sidebar .sa-btn.loading {
                 pointer-events: none;
             }
-
+            
             #smart-archive-sidebar .sa-btn .sa-spinner {
                 display: none;
                 width: 14px;
@@ -170,59 +170,59 @@ const ConsoleLogger = {
                 border-radius: 50%;
                 animation: sa-spin 0.8s linear infinite;
             }
-
+            
             #smart-archive-sidebar .sa-btn.loading .sa-spinner {
                 display: inline-block;
             }
-
+            
             #smart-archive-sidebar .sa-btn.loading .sa-icon {
                 display: none;
             }
-
+            
             @keyframes sa-spin {
                 to { transform: rotate(360deg); }
             }
-
+            
             #smart-archive-sidebar .sa-btn-primary {
                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             }
-
+            
             #smart-archive-sidebar .sa-btn-primary:hover {
                 background: linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%);
             }
-
+            
             #smart-archive-sidebar .sa-btn-success {
                 background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
             }
-
+            
             #smart-archive-sidebar .sa-btn-success:hover {
                 background: linear-gradient(135deg, #0e8a7d 0%, #2fd66d 100%);
             }
-
+            
             #smart-archive-sidebar .sa-btn-warning {
                 background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
             }
-
+            
             #smart-archive-sidebar .sa-btn-warning:hover {
                 background: linear-gradient(135deg, #e085e8 0%, #e04a5f 100%);
             }
-
+            
             #smart-archive-sidebar .sa-btn-info {
                 background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
             }
-
+            
             #smart-archive-sidebar .sa-btn-info:hover {
                 background: linear-gradient(135deg, #3e9ae6 0%, #00dce0 100%);
             }
-
+            
             #smart-archive-sidebar .sa-btn-purple {
                 background: linear-gradient(135deg, #a855f7 0%, #6366f1 100%);
             }
-
+            
             #smart-archive-sidebar .sa-btn-purple:hover {
                 background: linear-gradient(135deg, #9647e5 0%, #5559e4 100%);
             }
-
+            
             #smart-archive-sidebar .sa-status {
                 padding: 8px 10px;
                 border-radius: 8px;
@@ -234,37 +234,37 @@ const ConsoleLogger = {
                 justify-content: center;
                 gap: 6px;
             }
-
+            
             #smart-archive-sidebar .sa-status-dot {
                 width: 8px;
                 height: 8px;
                 border-radius: 50%;
                 animation: sa-pulse 2s infinite;
             }
-
+            
             #smart-archive-sidebar .sa-status.online {
                 background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
                 color: #166534;
             }
-
+            
             #smart-archive-sidebar .sa-status.online .sa-status-dot {
                 background: #22c55e;
             }
-
+            
             #smart-archive-sidebar .sa-status.offline {
                 background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
                 color: #991b1b;
             }
-
+            
             #smart-archive-sidebar .sa-status.offline .sa-status-dot {
                 background: #ef4444;
             }
-
+            
             @keyframes sa-pulse {
                 0%, 100% { opacity: 1; }
                 50% { opacity: 0.5; }
             }
-
+            
             #smart-archive-sidebar .sa-stars {
                 display: flex;
                 justify-content: center;
@@ -273,7 +273,7 @@ const ConsoleLogger = {
                 margin-top: 8px;
                 border-top: 1px solid #f0f0f0;
             }
-
+            
             #smart-archive-sidebar .sa-star {
                 font-size: 24px;
                 cursor: pointer;
@@ -281,16 +281,16 @@ const ConsoleLogger = {
                 color: #e5e7eb;
                 text-shadow: none;
             }
-
+            
             #smart-archive-sidebar .sa-star:hover {
                 transform: scale(1.3);
             }
-
+            
             #smart-archive-sidebar .sa-star.active {
                 color: #fbbf24;
                 text-shadow: 0 0 8px rgba(251, 191, 36, 0.5);
             }
-
+            
             #smart-archive-sidebar .sa-trigger {
                 position: absolute;
                 right: -28px;
@@ -309,18 +309,18 @@ const ConsoleLogger = {
                 box-shadow: 2px 2px 8px rgba(102, 126, 234, 0.4);
                 transition: all 0.3s ease;
             }
-
+            
             #smart-archive-sidebar .sa-trigger:hover {
                 background: linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%);
                 box-shadow: 2px 2px 12px rgba(102, 126, 234, 0.6);
             }
-
+            
             #smart-archive-sidebar .sa-divider {
                 height: 1px;
                 background: linear-gradient(90deg, transparent, #e5e7eb, transparent);
                 margin: 6px 0;
             }
-
+            
             #smart-archive-sidebar .sa-tooltip {
                 position: absolute;
                 left: calc(100% + 10px);
@@ -337,55 +337,10 @@ const ConsoleLogger = {
                 transition: all 0.2s ease;
                 z-index: 10000;
             }
-
+            
             #smart-archive-sidebar .sa-trigger:hover .sa-tooltip {
                 opacity: 1;
                 visibility: visible;
-            }
-
-            #smart-archive-sidebar .sa-card-preview {
-                background: #f5f7fa;
-                border-radius: 8px;
-                overflow: hidden;
-                margin-bottom: 8px;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            }
-
-            #smart-archive-sidebar .sa-card-preview-img {
-                width: 100%;
-                height: 80px;
-                object-fit: cover;
-                display: block;
-            }
-
-            #smart-archive-sidebar .sa-card-preview-title {
-                padding: 8px 10px;
-                font-size: 11px;
-                line-height: 1.3;
-                color: #374151;
-                font-weight: 500;
-                display: -webkit-box;
-                -webkit-line-clamp: 2;
-                -webkit-box-orient: vertical;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                background: white;
-            }
-
-            #smart-archive-sidebar .sa-card-placeholder {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                padding: 16px 10px;
-                color: #9ca3af;
-                font-size: 10px;
-                text-align: center;
-            }
-
-            #smart-archive-sidebar .sa-card-placeholder-icon {
-                font-size: 24px;
-                margin-bottom: 6px;
             }
         `;
         document.head.appendChild(style);
@@ -423,7 +378,7 @@ const ConsoleLogger = {
     // 创建侧边栏容器
     function createSidebarContainer() {
         injectStyles();
-
+        
         const container = document.createElement('div');
         container.id = 'smart-archive-sidebar';
         Object.assign(container.style, {
@@ -476,9 +431,9 @@ const ConsoleLogger = {
     function updateStatusIndicator(connected) {
         const indicator = document.getElementById('api-status-indicator');
         if (!indicator) return;
-
+        
         apiConnected = connected;
-
+        
         if (connected) {
             indicator.className = 'sa-status online';
             indicator.innerHTML = '<span class="sa-status-dot"></span><span class="sa-status-text">后端连接正常</span>';
@@ -486,45 +441,6 @@ const ConsoleLogger = {
             indicator.className = 'sa-status offline';
             indicator.innerHTML = '<span class="sa-status-dot"></span><span class="sa-status-text">后端连接失败</span>';
         }
-    }
-
-    // 创建卡片预览
-    function createCardPreview(initialTitle, initialCover) {
-        var container = document.createElement('div');
-        container.className = 'sa-card-preview';
-
-        function updateContent(title, cover) {
-            container.innerHTML = '';
-
-            if (cover) {
-                var img = document.createElement('img');
-                img.className = 'sa-card-preview-img';
-                img.src = cover;
-                img.alt = title;
-                img.onerror = function() {
-                    this.style.display = 'none';
-                    var placeholder = document.createElement('div');
-                    placeholder.className = 'sa-card-placeholder';
-                    placeholder.innerHTML = '<span class="sa-card-placeholder-icon">🖼️</span><span>封面加载失败</span>';
-                    container.appendChild(placeholder);
-                };
-                container.appendChild(img);
-            } else {
-                var placeholder = document.createElement('div');
-                placeholder.className = 'sa-card-placeholder';
-                placeholder.innerHTML = '<span class="sa-card-placeholder-icon">🖼️</span><span>暂无封面</span>';
-                container.appendChild(placeholder);
-            }
-
-            var titleDiv = document.createElement('div');
-            titleDiv.className = 'sa-card-preview-title';
-            titleDiv.textContent = title || '暂无标题';
-            container.appendChild(titleDiv);
-        }
-
-        updateContent(initialTitle, initialCover);
-        container.updateContent = updateContent;
-        return container;
     }
 
     // 创建星级评分
@@ -560,9 +476,9 @@ const ConsoleLogger = {
                     showToast('⚠️', '后端未连接，无法更新评分');
                     return;
                 }
-
+                
                 updateStars(i);
-
+                
                 try {
                     await apiClient.updateRating({
                         pageHref: location.href,
@@ -601,13 +517,13 @@ const ConsoleLogger = {
             boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
             backdropFilter: 'blur(10px)'
         });
-
+        
         const style = document.createElement('style');
         style.textContent = '@keyframes saToastIn { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } } @keyframes saToastOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100px); opacity: 0; } }';
         document.head.appendChild(style);
-
+        
         document.body.appendChild(toast);
-
+        
         setTimeout(() => {
             toast.style.animation = 'saToastOut 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards';
             setTimeout(() => toast.remove(), 300);
@@ -642,14 +558,14 @@ const ConsoleLogger = {
                 if (currentUrl.includes(atob(base64Path))) {
                     const element = document.querySelector(selector);
                     if (!element) continue;
-
+                    
                     let imageUrl = element.getAttribute(attr);
-
+                    
                     if (attr === 'style' && imageUrl) {
                         const match = imageUrl.match(/background-image:\s*url\(["']?([^"']+)["']?\)/i);
                         imageUrl = match ? match[1] : null;
                     }
-
+                    
                     if (imageUrl) {
                         return pre + imageUrl;
                     }
@@ -765,7 +681,7 @@ const ConsoleLogger = {
             m3u8List: pageInfo.m3u8(),
             timestamp: new Date().toISOString()
         };
-
+        
         try {
             navigator.clipboard.writeText(JSON.stringify(data, null, 2)).then(() => {
                 showToast('✅', '数据复制成功');
@@ -786,14 +702,14 @@ const ConsoleLogger = {
         });
         document.body.appendChild(textarea);
         textarea.select();
-
+        
         try {
             document.execCommand('copy');
             showToast('✅', '数据复制成功');
         } catch {
             showToast('❌', '复制失败');
         }
-
+        
         document.body.removeChild(textarea);
     }
 
@@ -922,7 +838,6 @@ const ConsoleLogger = {
         const sidebar = createSidebarContainer();
         const trigger = createTriggerButton();
         const statusIndicator = createStatusIndicator();
-        const cardPreview = createCardPreview(pageInfo.title, pageInfo.cover);
         const uploadBtn = createActionButton('💾 保存', 'sa-btn-primary');
         const deleteBtn = createActionButton('🗑️ 删除', 'sa-btn-warning');
         const copyBtn = createActionButton('📋 复制数据', 'sa-btn-purple');
@@ -937,7 +852,7 @@ const ConsoleLogger = {
         trigger.addEventListener('click', () => toggleSidebar());
 
         // 异步检查后端状态
-        checkBackendStatus(pageInfo, uploadBtn, deleteBtn, starRating, cardPreview);
+        checkBackendStatus(pageInfo, uploadBtn, deleteBtn, starRating);
 
         uploadBtn.onclick = async () => {
             if (uploadBtn.textContent.includes('已存')) return;
@@ -945,7 +860,7 @@ const ConsoleLogger = {
                 showToast('⚠️', '后端未连接，无法保存');
                 return;
             }
-
+            
             setButtonLoading(uploadBtn, true);
             try {
                 await apiClient.saveData({
@@ -970,7 +885,7 @@ const ConsoleLogger = {
                 showToast('⚠️', '后端未连接，无法删除');
                 return;
             }
-
+            
             setButtonLoading(deleteBtn, true);
             try {
                 await apiClient.deleteData(pageInfo.href);
@@ -991,7 +906,7 @@ const ConsoleLogger = {
                 showToast('⚠️', '后端未连接，无法刷新');
                 return;
             }
-
+            
             setButtonLoading(refreshBtn, true);
             try {
                 const newCover = getPageCover();
@@ -1002,7 +917,6 @@ const ConsoleLogger = {
                     m3u8List: pageInfo.m3u8()
                 });
                 pageInfo.cover = newCover || pageInfo.cover;
-                cardPreview.updateContent(pageInfo.title, pageInfo.cover);
                 showToast('✅', '刷新成功');
             } catch {
                 showToast('❌', '刷新失败，请重试');
@@ -1014,7 +928,6 @@ const ConsoleLogger = {
         copyBtn.onclick = () => { copyPageData(pageInfo); };
 
         sidebar.appendChild(statusIndicator);
-        sidebar.appendChild(cardPreview);
         sidebar.appendChild(uploadBtn);
         sidebar.appendChild(deleteBtn);
         sidebar.appendChild(copyBtn);
@@ -1022,13 +935,13 @@ const ConsoleLogger = {
         sidebar.appendChild(starRating);
         sidebar.appendChild(m3u8IndicatorEl);
         sidebar.appendChild(trigger);
-
+        
         document.body.appendChild(sidebar);
         resetSidebarTimer();
     }
 
     // 异步检查后端状态
-    async function checkBackendStatus(pageInfo, uploadBtn, deleteBtn, starRating, cardPreview) {
+    async function checkBackendStatus(pageInfo, uploadBtn, deleteBtn, starRating) {
         try {
             const res = await apiClient.checkExists(pageInfo.href);
             if (res.exists) {
@@ -1037,9 +950,6 @@ const ConsoleLogger = {
                 deleteBtn.style.display = 'flex';
                 if (res.m3u8List) res.m3u8List.forEach(addM3u8);
                 if (res.stars && res.stars > 0) starRating.updateRating(res.stars);
-                if (res.pageTitle || res.pageImg) {
-                    cardPreview.updateContent(res.pageTitle || pageInfo.title, res.pageImg || pageInfo.cover);
-                }
             }
         } catch {
             console.log('后端连接失败或未检测到已保存数据');
@@ -1052,7 +962,7 @@ const ConsoleLogger = {
             console.log('当前站点不在支持列表中，不显示悬浮框');
             return;
         }
-
+        
         if (document.readyState === 'complete') {
             main();
         } else {

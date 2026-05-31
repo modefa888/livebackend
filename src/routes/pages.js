@@ -1,11 +1,11 @@
-const express = require('express')
-const router = express.Router()
-const jwt = require('jsonwebtoken')
-const db = require('../config/db')
-const fs = require('fs')
-const path = require('path')
-const multer = require('multer')
-const bcrypt = require('bcryptjs')
+const express = require('express');
+const router = express.Router();
+const path = require('path');
+const fs = require('fs');
+const db = require('../config/db');
+const { logOperation } = require('./operation-logs');
+const multer = require('multer');
+const bcrypt = require('bcryptjs');
 
 // 配置multer存储
 const storage = multer.diskStorage({
@@ -430,6 +430,8 @@ router.put('/:id', async (req, res) => {
       'UPDATE pages SET title = ?, path = ?, content = ?, require_login = ?, status = ? WHERE id = ?',
       [title, pagePath, newFilename, require_login || 0, status || 1, id]
     )
+
+    await logOperation(req, 'update', '页面', parseInt(id), title || `页面${id}`, `更新页面: ${title || `ID ${id}`}`);
 
     res.json({ success: true, message: '页面更新成功' })
   } catch (error) {

@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const spiderLoader = require('../services/spider/spider-loader');
 const db = require('../config/db');
+const { logOperation } = require('./operation-logs');
 
 const authenticateToken = async (req, res, next) => {
     const token = req.headers.authorization?.split(' ')[1];
@@ -202,7 +203,9 @@ router.put('/config/:id', authenticateToken, verifyAdmin, async (req, res) => {
         } else if (configs.length > 0) {
             await spiderLoader.disableSpider(configs[0].file_name);
         }
-
+        
+        await logOperation(req, 'update', '爬虫接口', parseInt(id), req.body.name || `接口${id}`, `更新爬虫接口配置`);
+        
         res.json({ success: true, message: '配置更新成功' });
     } catch (error) {
         res.status(500).json({ success: false, message: '更新配置失败', error: error.message });
@@ -211,14 +214,18 @@ router.put('/config/:id', authenticateToken, verifyAdmin, async (req, res) => {
 
 router.delete('/config/:id', authenticateToken, verifyAdmin, async (req, res) => {
     try {
-        const [configs] = await db.execute('SELECT file_name FROM spider_api_configs WHERE id = ?', [req.params.id]);
+        const [configs] = await db.execute('SELECT file_name, name FROM spider_api_configs WHERE id = ?', [req.params.id]);
         if (configs.length === 0) {
             return res.status(404).json({ success: false, message: '配置不存在' });
         }
+        
+        const configName = configs[0].name;
 
         await spiderLoader.disableSpider(configs[0].file_name);
         await db.execute('DELETE FROM spider_api_configs WHERE id = ?', [req.params.id]);
-
+        
+        await logOperation(req, 'delete', '爬虫接口', parseInt(req.params.id), configName, `删除爬虫接口: ${configName}`);
+        
         res.json({ success: true, message: '配置删除成功' });
     } catch (error) {
         res.status(500).json({ success: false, message: '删除配置失败', error: error.message });
@@ -304,7 +311,9 @@ router.post('/discover', authenticateToken, verifyAdmin, async (req, res) => {
                 failed.push({ fileName, error: error.message });
             }
         }
-
+        
+        await logOperation(req, 'add', '爬虫接口', 0, `${added.length}个接口`, `发现并添加 ${added.length} 个爬虫接口`);
+        
         res.json({
             success: true,
             message: `发现 ${files.length} 个爬虫文件`,

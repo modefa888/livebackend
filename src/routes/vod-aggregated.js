@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
+const { logOperation } = require('./operation-logs');
 
 // 搜索缓存系统
 const searchCache = new Map();
@@ -60,6 +61,28 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
+// 创建聚合源
+router.post('/', authenticateToken, async (req, res) => {
+  try {
+    const { name, sourceIds, category, priority, status, config } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ message: '名称不能为空' });
+    }
+
+    const [result] = await pool.execute(
+      'INSERT INTO vod_aggregated_sources (name, source_ids, category, priority, status, config, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())',
+      [name, JSON.stringify(sourceIds || []), category || '', priority || 0, status || 'active', JSON.stringify(config || {})]
+    );
+
+    await logOperation(req, 'add', '影视聚合', result.insertId, name, `创建影视聚合: ${name}`);
+
+    res.status(201).json({ success: true, message: '聚合源创建成功', id: result.insertId });
+  } catch (error) {
+    res.status(500).json({ message: '创建聚合源失败', error: error.message });
+  }
+});
+
 // 获取聚合影视资源
 router.get('/aggregated', authenticateToken, async (req, res) => {
   try {
@@ -96,6 +119,86 @@ router.get('/by-domain', authenticateToken, async (req, res) => {
       message: '按域名分组获取影视资源失败', 
       error: error.message 
     });
+  }
+});
+
+// 更新聚合源
+router.put('/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, sourceIds, category, priority, status, config } = req.body;
+
+    const updates = [];
+    const values = [];
+
+    if (name !== undefined) {
+      updates.push('name = ?');
+      values.push(name);
+    }
+    if (sourceIds !== undefined) {
+      updates.push('source_ids = ?');
+      values.push(JSON.stringify(sourceIds));
+    }
+    if (category !== undefined) {
+      updates.push('category = ?');
+      values.push(category);
+    }
+    if (priority !== undefined) {
+      updates.push('priority = ?');
+      values.push(priority);
+    }
+    if (status !== undefined) {
+      updates.push('status = ?');
+      values.push(status);
+    }
+    if (config !== undefined) {
+      updates.push('config = ?');
+      values.push(JSON.stringify(config));
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ message: '没有可更新的字段' });
+    }
+
+    updates.push('updated_at = NOW()');
+    values.push(id);
+
+    const [result] = await pool.execute(
+      `UPDATE vod_aggregated_sources SET ${updates.join(', ')} WHERE id = ?`,
+      values
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: '聚合源不存在' });
+    }
+
+    await logOperation(req, 'update', '影视聚合', parseInt(id), name || `聚合源${id}`, `更新影视聚合: ${name || `ID ${id}`}`);
+
+    res.status(200).json({ success: true, message: '聚合源更新成功' });
+  } catch (error) {
+    res.status(500).json({ message: '更新聚合源失败', error: error.message });
+  }
+});
+
+// 删除聚合源
+router.delete('/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [sources] = await pool.execute('SELECT name FROM vod_aggregated_sources WHERE id = ?', [id]);
+    const sourceName = sources.length > 0 ? sources[0].name : `聚合源${id}`;
+
+    const [result] = await pool.execute('DELETE FROM vod_aggregated_sources WHERE id = ?', [id]);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: '聚合源不存在' });
+    }
+
+    await logOperation(req, 'delete', '影视聚合', parseInt(id), sourceName, `删除影视聚合: ${sourceName}`);
+
+    res.status(200).json({ success: true, message: '聚合源删除成功' });
+  } catch (error) {
+    res.status(500).json({ message: '删除聚合源失败', error: error.message });
   }
 });
 
@@ -316,96 +419,88 @@ router.get('/search/aggregate', authenticateToken, async (req, res) => {
     const stripHtml = (str) => str ? str.replace(/<[^>]*>/g, '').trim() : '';
 
     const parseEpisodes = (item) => {
-                console.log(`开始解析视频项，vod_name: ${item.vod_name || item.title || '未知'}`);
-                
-                // 获取播放源和播放链接
-                const playFrom = item.vod_play_from || '';
-                const playUrl = item.vod_play_url || item.play_url || item.playUrl || item.url || '';
-                const playServer = item.vod_play_server || '';
-                const playNote = item.vod_play_note || '';
-                
-                // 检查是否有多个播放源（用 $$$ 分隔）
-                const fromList = playFrom.split('$$$').filter(f => f.trim());
-                const urlList = playUrl.split('$$$').filter(u => u.trim());
-                const serverList = playServer.split('$$$');
-                const noteList = playNote.split('$$$');
-                
-                let allEpisodes = [];
-                
-                if (fromList.length > 0 && urlList.length > 0) {
-                    // 多播放源格式
-                    console.log(`检测到 ${Math.min(fromList.length, urlList.length)} 个播放源`);
-                    
-                    for (let i = 0; i < Math.min(fromList.length, urlList.length); i++) {
-                        const sourceName = fromList[i]?.trim() || `播放源${i + 1}`;
-                        const sourceUrls = urlList[i]?.trim() || '';
-                        const sourceServer = serverList[i]?.trim() || '';
-                        const sourceNote = noteList[i]?.trim() || '';
-                        
-                        if (!sourceUrls) continue;
-                        
-                        console.log(`解析播放源 [${sourceName}] 的链接`);
-                        
-                        // 解析单个播放源的集数
-                        const episodes = sourceUrls.split('#').map(p => {
-                            if (!p.trim()) return null;
-                            
-                            const parts = p.split('$');
-                            let name = parts[0]?.trim();
-                            let url = parts.slice(1).join('$')?.trim();
-                            
-                            // 如果只有链接没有名称，尝试从备注或其他地方获取
-                            if (!url && name && (name.startsWith('http') || name.includes('://'))) {
-                                url = name;
-                                name = '第' + (allEpisodes.length + 1) + '集';
-                            }
-                            
-                            // 筛选：只返回包含 .m3u8 的地址
-                            return name && url && url.includes('.m3u8') ? { 
-                                name, 
-                                url,
-                                source: sourceName,
-                                server: sourceServer,
-                                note: sourceNote
-                            } : null;
-                        }).filter(Boolean);
-                        
-                        console.log(`播放源 [${sourceName}] 解析到 ${episodes.length} 集`);
-                        allEpisodes = allEpisodes.concat(episodes);
-                    }
-                } else if (playUrl) {
-                    // 单播放源格式
-                    console.log(`单播放源格式，直接解析`);
-                    
-                    const episodes = playUrl.split('#').map(p => {
-                        if (!p.trim()) return null;
-                        
-                        const parts = p.split('$');
-                        let name = parts[0]?.trim();
-                        let url = parts.slice(1).join('$')?.trim();
-                        
-                        if (!url && name && (name.startsWith('http') || name.includes('://'))) {
-                            url = name;
-                            name = item.vod_name || item.title || '播放';
-                        }
-                        
-                        // 筛选：只返回包含 .m3u8 的地址
-                        return name && url && url.includes('.m3u8') ? { name, url } : null;
-                    }).filter(Boolean);
-                    
-                    if (episodes.length === 0 && playUrl.trim() && playUrl.includes('.m3u8')) {
-                        episodes.push({
-                            name: item.vod_name || item.title || '播放',
-                            url: playUrl
-                        });
-                    }
-                    
-                    allEpisodes = episodes;
-                }
-                
-                console.log(`总共解析到 ${allEpisodes.length} 个播放项`);
-                return allEpisodes;
-            };
+      console.log(`开始解析视频项，vod_name: ${item.vod_name || item.title || '未知'}`);
+      
+      const playFrom = item.vod_play_from || '';
+      const playUrl = item.vod_play_url || item.play_url || item.playUrl || item.url || '';
+      const playServer = item.vod_play_server || '';
+      const playNote = item.vod_play_note || '';
+      
+      const fromList = playFrom.split('$$$').filter(f => f.trim());
+      const urlList = playUrl.split('$$$').filter(u => u.trim());
+      const serverList = playServer.split('$$$');
+      const noteList = playNote.split('$$$');
+      
+      let allEpisodes = [];
+      
+      if (fromList.length > 0 && urlList.length > 0) {
+        console.log(`检测到 ${Math.min(fromList.length, urlList.length)} 个播放源`);
+        
+        for (let i = 0; i < Math.min(fromList.length, urlList.length); i++) {
+          const sourceName = fromList[i]?.trim() || `播放源${i + 1}`;
+          const sourceUrls = urlList[i]?.trim() || '';
+          const sourceServer = serverList[i]?.trim() || '';
+          const sourceNote = noteList[i]?.trim() || '';
+          
+          if (!sourceUrls) continue;
+          
+          console.log(`解析播放源 [${sourceName}] 的链接`);
+          
+          const episodes = sourceUrls.split('#').map(p => {
+            if (!p.trim()) return null;
+            
+            const parts = p.split('$');
+            let name = parts[0]?.trim();
+            let url = parts.slice(1).join('$')?.trim();
+            
+            if (!url && name && (name.startsWith('http') || name.includes('://'))) {
+              url = name;
+              name = '第' + (allEpisodes.length + 1) + '集';
+            }
+            
+            return name && url && url.includes('.m3u8') ? { 
+              name, 
+              url,
+              source: sourceName,
+              server: sourceServer,
+              note: sourceNote
+            } : null;
+          }).filter(Boolean);
+          
+          console.log(`播放源 [${sourceName}] 解析到 ${episodes.length} 集`);
+          allEpisodes = allEpisodes.concat(episodes);
+        }
+      } else if (playUrl) {
+        console.log(`单播放源格式，直接解析`);
+        
+        const episodes = playUrl.split('#').map(p => {
+          if (!p.trim()) return null;
+          
+          const parts = p.split('$');
+          let name = parts[0]?.trim();
+          let url = parts.slice(1).join('$')?.trim();
+          
+          if (!url && name && (name.startsWith('http') || name.includes('://'))) {
+            url = name;
+            name = item.vod_name || item.title || '播放';
+          }
+          
+          return name && url && url.includes('.m3u8') ? { name, url } : null;
+        }).filter(Boolean);
+        
+        if (episodes.length === 0 && playUrl.trim() && playUrl.includes('.m3u8')) {
+          episodes.push({
+            name: item.vod_name || item.title || '播放',
+            url: playUrl
+          });
+        }
+        
+        allEpisodes = episodes;
+      }
+      
+      console.log(`总共解析到 ${allEpisodes.length} 个播放项`);
+      return allEpisodes;
+    };
 
     const searchSource = async (source) => {
       try {
@@ -424,27 +519,27 @@ router.get('/search/aggregate', authenticateToken, async (req, res) => {
         else if (Array.isArray(data?.data)) list = data.data;
 
         return list.map((item, index) => {
-                        return {
-                            id: item.vod_id || item.id || `${source.id}-${index}`,
-                            title: item.vod_name || item.title || '未知标题',
-                            year: item.vod_year || item.year || '',
-                            type: item.type_name || item.type || '未知',
-                            desc: stripHtml(item.vod_content || item.vod_blurb || ''),
-                            pic: item.vod_pic || '',
-                            picThumb: item.vod_pic_thumb || '',
-                            picSlide: item.vod_pic_slide || '',
-                            actor: item.vod_actor || '',
-                            director: item.vod_director || '',
-                            remarks: item.vod_remarks || '',
-                            area: item.vod_area || '',
-                            lang: item.vod_lang || '',
-                            pubdate: item.vod_pubdate || '',
-                            playFrom: item.vod_play_from || '',
-                            episodes: parseEpisodes(item),
-                            sourceName: source.name,
-                            sourceId: source.id
-                        };
-                    });
+          return {
+            id: item.vod_id || item.id || `${source.id}-${index}`,
+            title: item.vod_name || item.title || '未知标题',
+            year: item.vod_year || item.year || '',
+            type: item.type_name || item.type || '未知',
+            desc: stripHtml(item.vod_content || item.vod_blurb || ''),
+            pic: item.vod_pic || '',
+            picThumb: item.vod_pic_thumb || '',
+            picSlide: item.vod_pic_slide || '',
+            actor: item.vod_actor || '',
+            director: item.vod_director || '',
+            remarks: item.vod_remarks || '',
+            area: item.vod_area || '',
+            lang: item.vod_lang || '',
+            pubdate: item.vod_pubdate || '',
+            playFrom: item.vod_play_from || '',
+            episodes: parseEpisodes(item),
+            sourceName: source.name,
+            sourceId: source.id
+          };
+        });
       } catch (err) {
         console.log(`[聚合搜索] ${source.name} 失败: ${err.message}`);
         return [];
@@ -600,96 +695,88 @@ router.get('/search/aggregate/stream/public', async (req, res) => {
     const stripHtml = (str) => str ? str.replace(/<[^>]*>/g, '').trim() : '';
 
     const parseEpisodes = (item) => {
-                console.log(`开始解析视频项，vod_name: ${item.vod_name || item.title || '未知'}`);
-                
-                // 获取播放源和播放链接
-                const playFrom = item.vod_play_from || '';
-                const playUrl = item.vod_play_url || item.play_url || item.playUrl || item.url || '';
-                const playServer = item.vod_play_server || '';
-                const playNote = item.vod_play_note || '';
-                
-                // 检查是否有多个播放源（用 $$$ 分隔）
-                const fromList = playFrom.split('$$$').filter(f => f.trim());
-                const urlList = playUrl.split('$$$').filter(u => u.trim());
-                const serverList = playServer.split('$$$');
-                const noteList = playNote.split('$$$');
-                
-                let allEpisodes = [];
-                
-                if (fromList.length > 0 && urlList.length > 0) {
-                    // 多播放源格式
-                    console.log(`检测到 ${Math.min(fromList.length, urlList.length)} 个播放源`);
-                    
-                    for (let i = 0; i < Math.min(fromList.length, urlList.length); i++) {
-                        const sourceName = fromList[i]?.trim() || `播放源${i + 1}`;
-                        const sourceUrls = urlList[i]?.trim() || '';
-                        const sourceServer = serverList[i]?.trim() || '';
-                        const sourceNote = noteList[i]?.trim() || '';
-                        
-                        if (!sourceUrls) continue;
-                        
-                        console.log(`解析播放源 [${sourceName}] 的链接`);
-                        
-                        // 解析单个播放源的集数
-                        const episodes = sourceUrls.split('#').map(p => {
-                            if (!p.trim()) return null;
-                            
-                            const parts = p.split('$');
-                            let name = parts[0]?.trim();
-                            let url = parts.slice(1).join('$')?.trim();
-                            
-                            // 如果只有链接没有名称，尝试从备注或其他地方获取
-                            if (!url && name && (name.startsWith('http') || name.includes('://'))) {
-                                url = name;
-                                name = '第' + (allEpisodes.length + 1) + '集';
-                            }
-                            
-                            // 筛选：只返回包含 .m3u8 的地址
-                            return name && url && url.includes('.m3u8') ? { 
-                                name, 
-                                url,
-                                source: sourceName,
-                                server: sourceServer,
-                                note: sourceNote
-                            } : null;
-                        }).filter(Boolean);
-                        
-                        console.log(`播放源 [${sourceName}] 解析到 ${episodes.length} 集`);
-                        allEpisodes = allEpisodes.concat(episodes);
-                    }
-                } else if (playUrl) {
-                    // 单播放源格式
-                    console.log(`单播放源格式，直接解析`);
-                    
-                    const episodes = playUrl.split('#').map(p => {
-                        if (!p.trim()) return null;
-                        
-                        const parts = p.split('$');
-                        let name = parts[0]?.trim();
-                        let url = parts.slice(1).join('$')?.trim();
-                        
-                        if (!url && name && (name.startsWith('http') || name.includes('://'))) {
-                            url = name;
-                            name = item.vod_name || item.title || '播放';
-                        }
-                        
-                        // 筛选：只返回包含 .m3u8 的地址
-                        return name && url && url.includes('.m3u8') ? { name, url } : null;
-                    }).filter(Boolean);
-                    
-                    if (episodes.length === 0 && playUrl.trim() && playUrl.includes('.m3u8')) {
-                        episodes.push({
-                            name: item.vod_name || item.title || '播放',
-                            url: playUrl
-                        });
-                    }
-                    
-                    allEpisodes = episodes;
-                }
-                
-                console.log(`总共解析到 ${allEpisodes.length} 个播放项`);
-                return allEpisodes;
-            };
+      console.log(`开始解析视频项，vod_name: ${item.vod_name || item.title || '未知'}`);
+      
+      const playFrom = item.vod_play_from || '';
+      const playUrl = item.vod_play_url || item.play_url || item.playUrl || item.url || '';
+      const playServer = item.vod_play_server || '';
+      const playNote = item.vod_play_note || '';
+      
+      const fromList = playFrom.split('$$$').filter(f => f.trim());
+      const urlList = playUrl.split('$$$').filter(u => u.trim());
+      const serverList = playServer.split('$$$');
+      const noteList = playNote.split('$$$');
+      
+      let allEpisodes = [];
+      
+      if (fromList.length > 0 && urlList.length > 0) {
+        console.log(`检测到 ${Math.min(fromList.length, urlList.length)} 个播放源`);
+        
+        for (let i = 0; i < Math.min(fromList.length, urlList.length); i++) {
+          const sourceName = fromList[i]?.trim() || `播放源${i + 1}`;
+          const sourceUrls = urlList[i]?.trim() || '';
+          const sourceServer = serverList[i]?.trim() || '';
+          const sourceNote = noteList[i]?.trim() || '';
+          
+          if (!sourceUrls) continue;
+          
+          console.log(`解析播放源 [${sourceName}] 的链接`);
+          
+          const episodes = sourceUrls.split('#').map(p => {
+            if (!p.trim()) return null;
+            
+            const parts = p.split('$');
+            let name = parts[0]?.trim();
+            let url = parts.slice(1).join('$')?.trim();
+            
+            if (!url && name && (name.startsWith('http') || name.includes('://'))) {
+              url = name;
+              name = '第' + (allEpisodes.length + 1) + '集';
+            }
+            
+            return name && url && url.includes('.m3u8') ? { 
+              name, 
+              url,
+              source: sourceName,
+              server: sourceServer,
+              note: sourceNote
+            } : null;
+          }).filter(Boolean);
+          
+          console.log(`播放源 [${sourceName}] 解析到 ${episodes.length} 集`);
+          allEpisodes = allEpisodes.concat(episodes);
+        }
+      } else if (playUrl) {
+        console.log(`单播放源格式，直接解析`);
+        
+        const episodes = playUrl.split('#').map(p => {
+          if (!p.trim()) return null;
+          
+          const parts = p.split('$');
+          let name = parts[0]?.trim();
+          let url = parts.slice(1).join('$')?.trim();
+          
+          if (!url && name && (name.startsWith('http') || name.includes('://'))) {
+            url = name;
+            name = item.vod_name || item.title || '播放';
+          }
+          
+          return name && url && url.includes('.m3u8') ? { name, url } : null;
+        }).filter(Boolean);
+        
+        if (episodes.length === 0 && playUrl.trim() && playUrl.includes('.m3u8')) {
+          episodes.push({
+            name: item.vod_name || item.title || '播放',
+            url: playUrl
+          });
+        }
+        
+        allEpisodes = episodes;
+      }
+      
+      console.log(`总共解析到 ${allEpisodes.length} 个播放项`);
+      return allEpisodes;
+    };
 
     const seen = new Set();
     let total = 0;
@@ -719,33 +806,33 @@ router.get('/search/aggregate/stream/public', async (req, res) => {
         let index = 0;
 
         for (const item of list) {
-                    const title = (item.vod_name || item.title || '').trim();
-                    const key = title.toLowerCase();
+          const title = (item.vod_name || item.title || '').trim();
+          const key = title.toLowerCase();
 
-                    if (!title || seen.has(key)) continue;
-                    seen.add(key);
+          if (!title || seen.has(key)) continue;
+          seen.add(key);
 
-                    results.push({
-                        id: item.vod_id || item.id || `${source.id}-${index++}`,
-                        title,
-                        year: item.vod_year || item.year || '',
-                        type: item.type_name || item.type || '未知',
-                        desc: stripHtml(item.vod_content || item.vod_blurb || ''),
-                        pic: item.vod_pic || '',
-                        picThumb: item.vod_pic_thumb || '',
-                        picSlide: item.vod_pic_slide || '',
-                        actor: item.vod_actor || '',
-                        director: item.vod_director || '',
-                        remarks: item.vod_remarks || '',
-                        area: item.vod_area || '',
-                        lang: item.vod_lang || '',
-                        pubdate: item.vod_pubdate || '',
-                        playFrom: item.vod_play_from || '',
-                        sourceName: source.name,
-                        sourceId: source.id,
-                        episodes: parseEpisodes(item)
-                    });
-                }
+          results.push({
+            id: item.vod_id || item.id || `${source.id}-${index++}`,
+            title,
+            year: item.vod_year || item.year || '',
+            type: item.type_name || item.type || '未知',
+            desc: stripHtml(item.vod_content || item.vod_blurb || ''),
+            pic: item.vod_pic || '',
+            picThumb: item.vod_pic_thumb || '',
+            picSlide: item.vod_pic_slide || '',
+            actor: item.vod_actor || '',
+            director: item.vod_director || '',
+            remarks: item.vod_remarks || '',
+            area: item.vod_area || '',
+            lang: item.vod_lang || '',
+            pubdate: item.vod_pubdate || '',
+            playFrom: item.vod_play_from || '',
+            sourceName: source.name,
+            sourceId: source.id,
+            episodes: parseEpisodes(item)
+          });
+        }
 
         if (results.length > 0) {
           total += results.length;
@@ -895,96 +982,88 @@ router.get('/search/aggregate/stream', authenticateToken, async (req, res) => {
     const stripHtml = (str) => str ? str.replace(/<[^>]*>/g, '').trim() : '';
 
     const parseEpisodes = (item) => {
-                console.log(`开始解析视频项，vod_name: ${item.vod_name || item.title || '未知'}`);
-                
-                // 获取播放源和播放链接
-                const playFrom = item.vod_play_from || '';
-                const playUrl = item.vod_play_url || item.play_url || item.playUrl || item.url || '';
-                const playServer = item.vod_play_server || '';
-                const playNote = item.vod_play_note || '';
-                
-                // 检查是否有多个播放源（用 $$$ 分隔）
-                const fromList = playFrom.split('$$$').filter(f => f.trim());
-                const urlList = playUrl.split('$$$').filter(u => u.trim());
-                const serverList = playServer.split('$$$');
-                const noteList = playNote.split('$$$');
-                
-                let allEpisodes = [];
-                
-                if (fromList.length > 0 && urlList.length > 0) {
-                    // 多播放源格式
-                    console.log(`检测到 ${Math.min(fromList.length, urlList.length)} 个播放源`);
-                    
-                    for (let i = 0; i < Math.min(fromList.length, urlList.length); i++) {
-                        const sourceName = fromList[i]?.trim() || `播放源${i + 1}`;
-                        const sourceUrls = urlList[i]?.trim() || '';
-                        const sourceServer = serverList[i]?.trim() || '';
-                        const sourceNote = noteList[i]?.trim() || '';
-                        
-                        if (!sourceUrls) continue;
-                        
-                        console.log(`解析播放源 [${sourceName}] 的链接`);
-                        
-                        // 解析单个播放源的集数
-                        const episodes = sourceUrls.split('#').map(p => {
-                            if (!p.trim()) return null;
-                            
-                            const parts = p.split('$');
-                            let name = parts[0]?.trim();
-                            let url = parts.slice(1).join('$')?.trim();
-                            
-                            // 如果只有链接没有名称，尝试从备注或其他地方获取
-                            if (!url && name && (name.startsWith('http') || name.includes('://'))) {
-                                url = name;
-                                name = '第' + (allEpisodes.length + 1) + '集';
-                            }
-                            
-                            // 筛选：只返回包含 .m3u8 的地址
-                            return name && url && url.includes('.m3u8') ? { 
-                                name, 
-                                url,
-                                source: sourceName,
-                                server: sourceServer,
-                                note: sourceNote
-                            } : null;
-                        }).filter(Boolean);
-                        
-                        console.log(`播放源 [${sourceName}] 解析到 ${episodes.length} 集`);
-                        allEpisodes = allEpisodes.concat(episodes);
-                    }
-                } else if (playUrl) {
-                    // 单播放源格式
-                    console.log(`单播放源格式，直接解析`);
-                    
-                    const episodes = playUrl.split('#').map(p => {
-                        if (!p.trim()) return null;
-                        
-                        const parts = p.split('$');
-                        let name = parts[0]?.trim();
-                        let url = parts.slice(1).join('$')?.trim();
-                        
-                        if (!url && name && (name.startsWith('http') || name.includes('://'))) {
-                            url = name;
-                            name = item.vod_name || item.title || '播放';
-                        }
-                        
-                        // 筛选：只返回包含 .m3u8 的地址
-                        return name && url && url.includes('.m3u8') ? { name, url } : null;
-                    }).filter(Boolean);
-                    
-                    if (episodes.length === 0 && playUrl.trim() && playUrl.includes('.m3u8')) {
-                        episodes.push({
-                            name: item.vod_name || item.title || '播放',
-                            url: playUrl
-                        });
-                    }
-                    
-                    allEpisodes = episodes;
-                }
-                
-                console.log(`总共解析到 ${allEpisodes.length} 个播放项`);
-                return allEpisodes;
-            };
+      console.log(`开始解析视频项，vod_name: ${item.vod_name || item.title || '未知'}`);
+      
+      const playFrom = item.vod_play_from || '';
+      const playUrl = item.vod_play_url || item.play_url || item.playUrl || item.url || '';
+      const playServer = item.vod_play_server || '';
+      const playNote = item.vod_play_note || '';
+      
+      const fromList = playFrom.split('$$$').filter(f => f.trim());
+      const urlList = playUrl.split('$$$').filter(u => u.trim());
+      const serverList = playServer.split('$$$');
+      const noteList = playNote.split('$$$');
+      
+      let allEpisodes = [];
+      
+      if (fromList.length > 0 && urlList.length > 0) {
+        console.log(`检测到 ${Math.min(fromList.length, urlList.length)} 个播放源`);
+        
+        for (let i = 0; i < Math.min(fromList.length, urlList.length); i++) {
+          const sourceName = fromList[i]?.trim() || `播放源${i + 1}`;
+          const sourceUrls = urlList[i]?.trim() || '';
+          const sourceServer = serverList[i]?.trim() || '';
+          const sourceNote = noteList[i]?.trim() || '';
+          
+          if (!sourceUrls) continue;
+          
+          console.log(`解析播放源 [${sourceName}] 的链接`);
+          
+          const episodes = sourceUrls.split('#').map(p => {
+            if (!p.trim()) return null;
+            
+            const parts = p.split('$');
+            let name = parts[0]?.trim();
+            let url = parts.slice(1).join('$')?.trim();
+            
+            if (!url && name && (name.startsWith('http') || name.includes('://'))) {
+              url = name;
+              name = '第' + (allEpisodes.length + 1) + '集';
+            }
+            
+            return name && url && url.includes('.m3u8') ? { 
+              name, 
+              url,
+              source: sourceName,
+              server: sourceServer,
+              note: sourceNote
+            } : null;
+          }).filter(Boolean);
+          
+          console.log(`播放源 [${sourceName}] 解析到 ${episodes.length} 集`);
+          allEpisodes = allEpisodes.concat(episodes);
+        }
+      } else if (playUrl) {
+        console.log(`单播放源格式，直接解析`);
+        
+        const episodes = playUrl.split('#').map(p => {
+          if (!p.trim()) return null;
+          
+          const parts = p.split('$');
+          let name = parts[0]?.trim();
+          let url = parts.slice(1).join('$')?.trim();
+          
+          if (!url && name && (name.startsWith('http') || name.includes('://'))) {
+            url = name;
+            name = item.vod_name || item.title || '播放';
+          }
+          
+          return name && url && url.includes('.m3u8') ? { name, url } : null;
+        }).filter(Boolean);
+        
+        if (episodes.length === 0 && playUrl.trim() && playUrl.includes('.m3u8')) {
+          episodes.push({
+            name: item.vod_name || item.title || '播放',
+            url: playUrl
+          });
+        }
+        
+        allEpisodes = episodes;
+      }
+      
+      console.log(`总共解析到 ${allEpisodes.length} 个播放项`);
+      return allEpisodes;
+    };
 
     const seen = new Set();
     let total = 0;
@@ -1009,33 +1088,33 @@ router.get('/search/aggregate/stream', authenticateToken, async (req, res) => {
         const results = [];
 
         for (const item of list) {
-                    const title = (item.vod_name || item.title || '').trim();
-                    const key = title.toLowerCase();
+          const title = (item.vod_name || item.title || '').trim();
+          const key = title.toLowerCase();
 
-                    if (!title || seen.has(key)) continue;
-                    seen.add(key);
+          if (!title || seen.has(key)) continue;
+          seen.add(key);
 
-                    results.push({
-                        id: item.vod_id || item.id || `${source.id}-${index}`,
-                        title,
-                        year: item.vod_year || item.year || '',
-                        type: item.type_name || item.type || '未知',
-                        desc: stripHtml(item.vod_content || item.vod_blurb || ''),
-                        pic: item.vod_pic || '',
-                        picThumb: item.vod_pic_thumb || '',
-                        picSlide: item.vod_pic_slide || '',
-                        actor: item.vod_actor || '',
-                        director: item.vod_director || '',
-                        remarks: item.vod_remarks || '',
-                        area: item.vod_area || '',
-                        lang: item.vod_lang || '',
-                        pubdate: item.vod_pubdate || '',
-                        playFrom: item.vod_play_from || '',
-                        sourceName: source.name,
-                        sourceId: source.id,
-                        episodes: parseEpisodes(item)
-                    });
-                }
+          results.push({
+            id: item.vod_id || item.id || `${source.id}-${index}`,
+            title,
+            year: item.vod_year || item.year || '',
+            type: item.type_name || item.type || '未知',
+            desc: stripHtml(item.vod_content || item.vod_blurb || ''),
+            pic: item.vod_pic || '',
+            picThumb: item.vod_pic_thumb || '',
+            picSlide: item.vod_pic_slide || '',
+            actor: item.vod_actor || '',
+            director: item.vod_director || '',
+            remarks: item.vod_remarks || '',
+            area: item.vod_area || '',
+            lang: item.vod_lang || '',
+            pubdate: item.vod_pubdate || '',
+            playFrom: item.vod_play_from || '',
+            sourceName: source.name,
+            sourceId: source.id,
+            episodes: parseEpisodes(item)
+          });
+        }
 
         if (results.length > 0) {
           total += results.length;

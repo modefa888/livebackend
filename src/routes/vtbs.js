@@ -134,7 +134,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
     }
     
     // 记录操作日志
-    await logOperation(req, 'update', 'vtb', id, username, `更新主播: ${originalUsername} → ${username}, 房间号: ${roomid}, 平台: ${site}`);
+    await logOperation(req, 'update', '主播', id, username, `更新主播: ${originalUsername} → ${username}, 房间号: ${roomid}, 平台: ${site}`);
     
     res.status(200).json({ message: '主播更新成功' });
   } catch (error) {
@@ -168,7 +168,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     }
     
     // 记录操作日志
-    await logOperation(req, 'delete', 'vtb', id, username, `删除主播: ${username}`);
+    await logOperation(req, 'delete', '主播', id, username, `删除主播: ${username}`);
     
     res.status(200).json({ message: '主播删除成功' });
   } catch (error) {

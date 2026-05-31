@@ -4,6 +4,7 @@ const os = require('os');
 const { exec } = require('child_process');
 const router = express.Router();
 const db = require('../config/db');
+const { logOperation } = require('./operation-logs');
 
 // 中间件：验证JWT令牌
 const authenticateToken = async (req, res, next) => {
@@ -287,6 +288,102 @@ router.post('/interval', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('设置监控频率错误:', error.message);
     res.status(500).json({ message: '服务器内部错误' });
+  }
+});
+
+// 创建监控任务
+router.post('/tasks', authenticateToken, async (req, res) => {
+  try {
+    const { name, type, config } = req.body;
+    
+    if (!name || !type) {
+      return res.status(400).json({ message: '任务名称和类型不能为空' });
+    }
+    
+    const [result] = await db.execute(
+      'INSERT INTO monitor_tasks (name, type, config, is_enabled) VALUES (?, ?, ?, ?)',
+      [name, type, JSON.stringify(config || {}), true]
+    );
+    
+    await logOperation(req, 'add', '监控', result.insertId, name, `创建监控任务: ${name}`);
+    
+    res.status(201).json({ 
+      success: true, 
+      message: '监控任务创建成功',
+      taskId: result.insertId
+    });
+  } catch (error) {
+    res.status(500).json({ message: '创建监控任务失败', error: error.message });
+  }
+});
+
+// 删除监控任务
+router.delete('/tasks/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const [tasks] = await db.execute('SELECT name FROM monitor_tasks WHERE id = ?', [id]);
+    const taskName = tasks.length > 0 ? tasks[0].name : `任务${id}`;
+    
+    const [result] = await db.execute('DELETE FROM monitor_tasks WHERE id = ?', [id]);
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: '监控任务不存在' });
+    }
+    
+    await logOperation(req, 'delete', '监控', parseInt(id), taskName, `删除监控任务: ${taskName}`);
+    
+    res.status(200).json({ success: true, message: '监控任务删除成功' });
+  } catch (error) {
+    res.status(500).json({ message: '删除监控任务失败', error: error.message });
+  }
+});
+
+// 更新监控任务
+router.put('/tasks/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, type, config, is_enabled } = req.body;
+    
+    const updates = [];
+    const values = [];
+    
+    if (name !== undefined) {
+      updates.push('name = ?');
+      values.push(name);
+    }
+    if (type !== undefined) {
+      updates.push('type = ?');
+      values.push(type);
+    }
+    if (config !== undefined) {
+      updates.push('config = ?');
+      values.push(JSON.stringify(config));
+    }
+    if (is_enabled !== undefined) {
+      updates.push('is_enabled = ?');
+      values.push(is_enabled);
+    }
+    
+    if (updates.length === 0) {
+      return res.status(400).json({ message: '没有可更新的字段' });
+    }
+    
+    values.push(id);
+    const [result] = await db.execute(
+      `UPDATE monitor_tasks SET ${updates.join(', ')} WHERE id = ?`,
+      values
+    );
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: '监控任务不存在' });
+    }
+    
+    await logOperation(req, 'update', '监控', parseInt(id), name || `任务${id}`, `更新监控任务: ${name || `ID ${id}`}`);
+    
+    res.status(200).json({ success: true, message: '监控任务更新成功' });
+  } catch (error) {
+    res.status(500).json({ message: '更新监控任务失败', error: error.message });
   }
 });
 

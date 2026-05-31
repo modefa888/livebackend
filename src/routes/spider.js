@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const spiderManager = require('../services/spider/spider-manager');
 const db = require('../config/db');
+const { logOperation } = require('./operation-logs');
 
 // 中间件：验证JWT令牌
 const authenticateToken = async (req, res, next) => {
@@ -230,6 +231,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     const result = await spiderManager.deleteSpider(parseInt(id));
 
     if (result.success) {
+      await logOperation(req, 'delete', 'spider', parseInt(id), `爬虫${id}`, `删除爬虫: ID ${id}`);
       res.status(200).json(result);
     } else {
       res.status(400).json(result);
@@ -264,6 +266,7 @@ router.put('/toggle/:name', authenticateToken, async (req, res) => {
     const result = await spiderManager.updateSpiderStatus(name, isEnabled);
 
     if (result.success) {
+      await logOperation(req, 'update', 'spider', 0, name, `${isEnabled ? '启用' : '禁用'}爬虫: ${name}`);
       res.status(200).json(result);
     } else {
       res.status(400).json(result);
@@ -392,6 +395,8 @@ router.post('/script', authenticateToken, async (req, res) => {
     } catch (error) {
       console.error('保存测试关键字失败:', error);
     }
+    
+    await logOperation(req, 'update', 'spider', 0, site, `保存爬虫脚本: ${site}`);
     
     res.status(200).json({ success: true, message: '脚本保存成功' });
   } catch (error) {
@@ -645,6 +650,8 @@ router.post('/add-from-local', authenticateToken, async (req, res) => {
       'INSERT INTO spider_configs (name, type, host, crawlInterval, script_content, is_enabled) VALUES (?, ?, ?, ?, ?, ?)',
       [spiderData.name, spiderData.type, spiderData.host, spiderData.crawlInterval, spiderData.scriptContent, spiderData.isEnabled]
     );
+    
+    await logOperation(req, 'add', 'spider', 0, name, `从本地脚本添加爬虫: ${name}`);
     
     res.status(200).json({ success: true, message: '爬虫添加成功' });
   } catch (error) {

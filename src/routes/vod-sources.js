@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../../bots/fabuBot/config/database');
+const { logOperation } = require('./operation-logs');
 
 // 中间件：验证JWT令牌
 const authenticateToken = async (req, res, next) => {
@@ -581,6 +582,8 @@ router.post('/', authenticateToken, verifyAdmin, async (req, res) => {
         [id, name, url, type, category, enabled, sort]
       );
 
+      await logOperation(req, 'add', '影视资源', id, name, `添加影视资源: ${name}`);
+
       res.status(200).json({ success: true, message: '影视资源添加成功' });
     } finally {
       conn.release();
@@ -646,6 +649,8 @@ router.put('/:id', authenticateToken, verifyAdmin, async (req, res) => {
         values
       );
 
+      await logOperation(req, 'update', '影视资源', parseInt(id), name || `资源${id}`, `更新影视资源: ${name || `ID ${id}`}`);
+
       res.status(200).json({ success: true, message: '影视资源更新成功' });
     } finally {
       conn.release();
@@ -672,6 +677,8 @@ router.put('/sort/batch', authenticateToken, verifyAdmin, async (req, res) => {
           [item.sort, item.id]
         );
       }
+
+      await logOperation(req, 'update', '影视资源', 0, '批量排序', `批量更新影视资源排序`);
 
       res.status(200).json({ success: true, message: '排序更新成功' });
     } finally {

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
+const { logOperation } = require('./operation-logs');
 
 // 中间件：验证JWT令牌
 const authenticateToken = async (req, res, next) => {
@@ -143,6 +144,7 @@ router.post('/start', authenticateToken, verifyAdmin, async (req, res) => {
     );
     
     if (result) {
+      await logOperation(req, 'update', '机器人', 'livebot', 'LiveBot', '启动机器人');
       res.status(200).json({ success: true, message: '机器人启动成功' });
     } else {
       const { getBotStatus } = require('../../bots/livebot/bot');
@@ -168,6 +170,7 @@ router.post('/stop', authenticateToken, verifyAdmin, async (req, res) => {
     const { stopBot } = require('../../bots/livebot/bot');
     const result = await stopBot();
     if (result) {
+      await logOperation(req, 'update', '机器人', 'livebot', 'LiveBot', '停止机器人');
       res.status(200).json({ success: true, message: '机器人停止成功' });
     } else {
       res.status(400).json({ success: false, message: '机器人停止失败' });
@@ -335,32 +338,33 @@ router.post('/search/logs', authenticateToken, async (req, res) => {
   });
 
   // 添加命令
-  router.post('/commands', authenticateToken, verifyAdmin, async (req, res) => {
-    try {
-      const db = require('../config/db');
-      const { command, description, isEnabled = true, isAdmin = false } = req.body;
-      
-      if (!command || !description) {
-        return res.status(400).json({ message: '命令和描述不能为空' });
-      }
-      
-      // 检查命令是否已存在
-      const [existingCommands] = await db.execute('SELECT * FROM bot_commands WHERE command = ?', [command]);
-      if (existingCommands.length > 0) {
-        return res.status(400).json({ message: '命令已存在' });
-      }
-      
-      await db.execute('INSERT INTO bot_commands (command, description, isEnabled, isAdmin) VALUES (?, ?, ?, ?)', [command, description, isEnabled, isAdmin]);
-      
-      // 重新加载命令列表
-      const { updateBotCommands } = require('../../bots/livebot/bot');
-      await updateBotCommands();
-      
-      res.status(200).json({ success: true, message: '命令添加成功' });
-    } catch (error) {
-      res.status(500).json({ message: '添加命令失败', error: error.message });
+router.post('/commands', authenticateToken, verifyAdmin, async (req, res) => {
+  try {
+    const db = require('../config/db');
+    const { command, description, isEnabled = true, isAdmin = false } = req.body;
+    
+    if (!command || !description) {
+      return res.status(400).json({ message: '命令和描述不能为空' });
     }
-  });
+    
+    // 检查命令是否已存在
+    const [existingCommands] = await db.execute('SELECT * FROM bot_commands WHERE command = ?', [command]);
+    if (existingCommands.length > 0) {
+      return res.status(400).json({ message: '命令已存在' });
+    }
+    
+    await db.execute('INSERT INTO bot_commands (command, description, isEnabled, isAdmin) VALUES (?, ?, ?, ?)', [command, description, isEnabled, isAdmin]);
+    
+    // 重新加载命令列表
+    const { updateBotCommands } = require('../../bots/livebot/bot');
+    await updateBotCommands();
+    
+    await logOperation(req, 'add', '机器人命令', command, command, `添加命令: ${description}`);
+    res.status(200).json({ success: true, message: '命令添加成功' });
+  } catch (error) {
+    res.status(500).json({ message: '添加命令失败', error: error.message });
+  }
+});
 
   // 更新命令顺序
   router.put('/commands/order', authenticateToken, verifyAdmin, async (req, res) => {
@@ -388,65 +392,67 @@ router.post('/search/logs', authenticateToken, async (req, res) => {
   });
 
   // 删除命令
-  router.delete('/commands/:command', authenticateToken, verifyAdmin, async (req, res) => {
-    try {
-      const db = require('../config/db');
-      const { command } = req.params;
-      
-      let [result] = await db.execute('DELETE FROM bot_commands WHERE command = ?', [command]);
-      
-      if (result.affectedRows === 0) {
-        const commandWithSlash = '/' + command;
-        [result] = await db.execute('DELETE FROM bot_commands WHERE command = ?', [commandWithSlash]);
-      }
-      
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ message: '命令不存在' });
-      }
-      
-      const { updateBotCommands } = require('../../bots/livebot/bot');
-      await updateBotCommands();
-      
-      res.status(200).json({ success: true, message: '命令删除成功' });
-    } catch (error) {
-      res.status(500).json({ message: '删除命令失败', error: error.message });
+router.delete('/commands/:command', authenticateToken, verifyAdmin, async (req, res) => {
+  try {
+    const db = require('../config/db');
+    const { command } = req.params;
+    
+    let [result] = await db.execute('DELETE FROM bot_commands WHERE command = ?', [command]);
+    
+    if (result.affectedRows === 0) {
+      const commandWithSlash = '/' + command;
+      [result] = await db.execute('DELETE FROM bot_commands WHERE command = ?', [commandWithSlash]);
     }
-  });
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: '命令不存在' });
+    }
+    
+    const { updateBotCommands } = require('../../bots/livebot/bot');
+    await updateBotCommands();
+    
+    await logOperation(req, 'delete', '机器人命令', command, command, '删除命令');
+    res.status(200).json({ success: true, message: '命令删除成功' });
+  } catch (error) {
+    res.status(500).json({ message: '删除命令失败', error: error.message });
+  }
+});
 
   // 更新命令
-  router.put('/commands/:command', authenticateToken, verifyAdmin, async (req, res) => {
-    try {
-      const db = require('../config/db');
-      const { command } = req.params;
-      const { description, isEnabled, isAdmin, order } = req.body;
-      
-      // 首先获取命令的当前值
-      const [commands] = await db.execute('SELECT description, isEnabled, isAdmin, `order` FROM bot_commands WHERE command = ?', [command]);
-      if (commands.length === 0) {
-        return res.status(404).json({ message: '命令不存在' });
-      }
-      
-      // 使用现有值或新值
-      const currentCommand = commands[0];
-      const newDescription = description || currentCommand.description;
-      const newIsEnabled = isEnabled !== undefined ? isEnabled : currentCommand.isEnabled;
-      const newIsAdmin = isAdmin !== undefined ? isAdmin : currentCommand.isAdmin;
-      const newOrder = order !== undefined ? order : currentCommand.order;
-      
-      const [result] = await db.execute('UPDATE bot_commands SET description = ?, isEnabled = ?, isAdmin = ?, `order` = ? WHERE command = ?', [newDescription, newIsEnabled, newIsAdmin, newOrder, command]);
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ message: '命令不存在' });
-      }
-      
-      // 重新加载命令列表
-      const { updateBotCommands } = require('../../bots/livebot/bot');
-      await updateBotCommands();
-      
-      res.status(200).json({ success: true, message: '命令更新成功' });
-    } catch (error) {
-      res.status(500).json({ message: '更新命令失败', error: error.message });
+router.put('/commands/:command', authenticateToken, verifyAdmin, async (req, res) => {
+  try {
+    const db = require('../config/db');
+    const { command } = req.params;
+    const { description, isEnabled, isAdmin, order } = req.body;
+    
+    // 首先获取命令的当前值
+    const [commands] = await db.execute('SELECT description, isEnabled, isAdmin, `order` FROM bot_commands WHERE command = ?', [command]);
+    if (commands.length === 0) {
+      return res.status(404).json({ message: '命令不存在' });
     }
-  });
+    
+    // 使用现有值或新值
+    const currentCommand = commands[0];
+    const newDescription = description || currentCommand.description;
+    const newIsEnabled = isEnabled !== undefined ? isEnabled : currentCommand.isEnabled;
+    const newIsAdmin = isAdmin !== undefined ? isAdmin : currentCommand.isAdmin;
+    const newOrder = order !== undefined ? order : currentCommand.order;
+    
+    const [result] = await db.execute('UPDATE bot_commands SET description = ?, isEnabled = ?, isAdmin = ?, `order` = ? WHERE command = ?', [newDescription, newIsEnabled, newIsAdmin, newOrder, command]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: '命令不存在' });
+    }
+    
+    // 重新加载命令列表
+    const { updateBotCommands } = require('../../bots/livebot/bot');
+    await updateBotCommands();
+    
+    await logOperation(req, 'update', '机器人命令', command, command, `更新命令: ${newDescription}`);
+    res.status(200).json({ success: true, message: '命令更新成功' });
+  } catch (error) {
+    res.status(500).json({ message: '更新命令失败', error: error.message });
+  }
+});
 
   // 消息发送相关路由
 
@@ -618,106 +624,117 @@ router.post('/search/logs', authenticateToken, async (req, res) => {
   });
 
   // 添加群组
-  router.post('/groups', authenticateToken, verifyAdmin, async (req, res) => {
-    try {
-      const db = require('../config/db');
-      const { groupId, groupName, permissionLevel, type, userId } = req.body;
-      
-      if (!groupId || !groupName || !type || !userId) {
-        return res.status(400).json({ message: '群组ID、群组名称、类型和用户ID不能为空' });
-      }
-      
-      const [result] = await db.execute(
-        'INSERT INTO bot_groups (groupId, groupName, permissionLevel, type, userId) VALUES (?, ?, ?, ?, ?)',
-        [groupId, groupName, permissionLevel || 1, type, userId]
-      );
-      
-      const [group] = await db.execute('SELECT * FROM bot_groups WHERE id = ?', [result.insertId]);
-      res.status(200).json(group[0]);
-    } catch (error) {
-      res.status(500).json({ message: '添加群组失败', error: error.message });
+router.post('/groups', authenticateToken, verifyAdmin, async (req, res) => {
+  try {
+    const db = require('../config/db');
+    const { groupId, groupName, permissionLevel, type, userId } = req.body;
+    
+    if (!groupId || !groupName || !type || !userId) {
+      return res.status(400).json({ message: '群组ID、群组名称、类型和用户ID不能为空' });
     }
-  });
+    
+    const [result] = await db.execute(
+      'INSERT INTO bot_groups (groupId, groupName, permissionLevel, type, userId) VALUES (?, ?, ?, ?, ?)',
+      [groupId, groupName, permissionLevel || 1, type, userId]
+    );
+    
+    await logOperation(req, 'add', '机器人群组', result.insertId, groupName, `添加群组: ${groupName}`);
+    const [group] = await db.execute('SELECT * FROM bot_groups WHERE id = ?', [result.insertId]);
+    res.status(200).json(group[0]);
+  } catch (error) {
+    res.status(500).json({ message: '添加群组失败', error: error.message });
+  }
+});
 
   // 更新群组
-  router.put('/groups/:id', authenticateToken, verifyAdmin, async (req, res) => {
-    try {
-      const db = require('../config/db');
-      const { id } = req.params;
-      const { groupName, permissionLevel, type } = req.body;
-      
-      if (!groupName) {
-        return res.status(400).json({ message: '群组名称不能为空' });
-      }
-      
-      const [result] = await db.execute(
-        'UPDATE bot_groups SET groupName = ?, permissionLevel = ?, type = ? WHERE id = ?',
-        [groupName, permissionLevel || 1, type, id]
-      );
-      
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ message: '群组不存在' });
-      }
-      
-      const [group] = await db.execute('SELECT * FROM bot_groups WHERE id = ?', [id]);
-      res.status(200).json(group[0]);
-    } catch (error) {
-      res.status(500).json({ message: '更新群组失败', error: error.message });
+router.put('/groups/:id', authenticateToken, verifyAdmin, async (req, res) => {
+  try {
+    const db = require('../config/db');
+    const { id } = req.params;
+    const { groupName, permissionLevel, type } = req.body;
+    
+    if (!groupName) {
+      return res.status(400).json({ message: '群组名称不能为空' });
     }
-  });
+    
+    const [result] = await db.execute(
+      'UPDATE bot_groups SET groupName = ?, permissionLevel = ?, type = ? WHERE id = ?',
+      [groupName, permissionLevel || 1, type, id]
+    );
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: '群组不存在' });
+    }
+    
+    await logOperation(req, 'update', '机器人群组', id, groupName, `更新群组: ${groupName}`);
+    const [group] = await db.execute('SELECT * FROM bot_groups WHERE id = ?', [id]);
+    res.status(200).json(group[0]);
+  } catch (error) {
+    res.status(500).json({ message: '更新群组失败', error: error.message });
+  }
+});
 
   // 删除群组
-  router.delete('/groups/:id', authenticateToken, verifyAdmin, async (req, res) => {
-    try {
-      const db = require('../config/db');
-      const { id } = req.params;
-      
-      const [result] = await db.execute('DELETE FROM bot_groups WHERE id = ?', [id]);
-      
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ message: '群组不存在' });
-      }
-      
-      res.status(200).json({ success: true, message: '群组删除成功' });
-    } catch (error) {
-      res.status(500).json({ message: '删除群组失败', error: error.message });
+router.delete('/groups/:id', authenticateToken, verifyAdmin, async (req, res) => {
+  try {
+    const db = require('../config/db');
+    const { id } = req.params;
+    
+    // 获取群组名称用于日志
+    const [groups] = await db.execute('SELECT groupName FROM bot_groups WHERE id = ?', [id]);
+    if (groups.length === 0) {
+      return res.status(404).json({ message: '群组不存在' });
     }
-  });
+    const groupName = groups[0].groupName;
+    
+    const [result] = await db.execute('DELETE FROM bot_groups WHERE id = ?', [id]);
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: '群组不存在' });
+    }
+    
+    await logOperation(req, 'delete', '机器人群组', id, groupName, '删除群组');
+    res.status(200).json({ success: true, message: '群组删除成功' });
+  } catch (error) {
+    res.status(500).json({ message: '删除群组失败', error: error.message });
+  }
+});
 
   // 禁用/启用群组
-  router.put('/groups/:id/disable', authenticateToken, verifyAdmin, async (req, res) => {
-    try {
-      const db = require('../config/db');
-      const { id } = req.params;
-      const { disabled } = req.body;
-      
-      // 获取群组信息，包括 groupId
-      const [groups] = await db.execute('SELECT groupId FROM bot_groups WHERE id = ?', [id]);
-      if (groups.length === 0) {
-        return res.status(404).json({ message: '群组不存在' });
-      }
-      const groupId = groups[0].groupId;
-      
-      // 更新群组状态
-      const [result] = await db.execute('UPDATE bot_groups SET disabled = ? WHERE id = ?', [disabled, id]);
-      
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ message: '群组不存在' });
-      }
-      
-      // 如果是禁用群组，同时禁用该群组的所有关注
-      // 如果是启用群组，同时启用该群组的所有关注
-      if (disabled) {
-        await db.execute('UPDATE watch SET disabled = 1 WHERE chatid = ?', [groupId]);
-      } else {
-        await db.execute('UPDATE watch SET disabled = 0 WHERE chatid = ?', [groupId]);
-      }
-      
-      res.status(200).json({ success: true, message: disabled ? '群组已禁用，同时禁用了所有关注' : '群组已启用，同时恢复了所有关注' });
-    } catch (error) {
-      res.status(500).json({ message: '更新群组状态失败', error: error.message });
+router.put('/groups/:id/disable', authenticateToken, verifyAdmin, async (req, res) => {
+  try {
+    const db = require('../config/db');
+    const { id } = req.params;
+    const { disabled } = req.body;
+    
+    // 获取群组信息，包括 groupId
+    const [groups] = await db.execute('SELECT groupId, groupName FROM bot_groups WHERE id = ?', [id]);
+    if (groups.length === 0) {
+      return res.status(404).json({ message: '群组不存在' });
     }
-  });
+    const { groupId, groupName } = groups[0];
+    
+    // 更新群组状态
+    const [result] = await db.execute('UPDATE bot_groups SET disabled = ? WHERE id = ?', [disabled, id]);
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: '群组不存在' });
+    }
+    
+    // 如果是禁用群组，同时禁用该群组的所有关注
+    // 如果是启用群组，同时启用该群组的所有关注
+    if (disabled) {
+      await db.execute('UPDATE watch SET disabled = 1 WHERE chatid = ?', [groupId]);
+    } else {
+      await db.execute('UPDATE watch SET disabled = 0 WHERE chatid = ?', [groupId]);
+    }
+    
+    await logOperation(req, 'update', '机器人群组', id, groupName, disabled ? '禁用群组' : '启用群组');
+    res.status(200).json({ success: true, message: disabled ? '群组已禁用，同时禁用了所有关注' : '群组已启用，同时恢复了所有关注' });
+  } catch (error) {
+    res.status(500).json({ message: '更新群组状态失败', error: error.message });
+  }
+});
 
   // 获取主播列表（用于关注主播功能）
   router.get('/groups/:groupId/vtbs', authenticateToken, async (req, res) => {

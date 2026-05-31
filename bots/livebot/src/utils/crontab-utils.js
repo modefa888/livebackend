@@ -4,8 +4,8 @@ const exec = require('child_process').exec;
 // 保存任务的引用，以便我们可以动态管理
 let task;
 
-// 默认调度时间（例如：每 60 分钟）
-let scheduleTime = '*/60 * * * *';
+// 默认调度时间（每天凌晨2点重启）
+let scheduleTime = '0 2 * * *';
 
 let $ = null;
 

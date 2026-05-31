@@ -6,6 +6,7 @@ const multer = require('multer');
 const taskScheduler = require('../services/tools/task-scheduler');
 const systemManager = require('../services/tools/system-manager');
 const db = require('../config/db');
+const { logOperation } = require('./operation-logs');
 
 // 配置multer存储
 const storage = multer.diskStorage({
@@ -159,6 +160,7 @@ router.post('/tasks/add', authenticateToken, verifyAdmin, async (req, res) => {
     const result = await taskScheduler.addTask(config);
 
     if (result.success) {
+      await logOperation(req, 'add', '定时任务', result.taskId || 0, config.name || '未命名任务', `添加定时任务: ${config.name || '未命名任务'}`);
       res.status(200).json(result);
     } else {
       res.status(400).json(result);
@@ -192,6 +194,7 @@ router.put('/tasks/:id', authenticateToken, verifyAdmin, async (req, res) => {
     const result = await taskScheduler.updateTask(parseInt(id), config);
 
     if (result.success) {
+      await logOperation(req, 'update', '定时任务', parseInt(id), config.name || `任务${id}`, `更新定时任务: ${config.name || `ID ${id}`}`);
       res.status(200).json(result);
     } else {
       res.status(400).json(result);
@@ -451,6 +454,7 @@ router.put('/system/config', authenticateToken, verifyAdmin, async (req, res) =>
     const config = req.body;
     const result = await systemManager.updateConfig(config);
     if (result.success) {
+      await logOperation(req, 'update', '系统设置', 0, '系统配置', `更新系统配置`);
       res.status(200).json(result);
     } else {
       res.status(400).json(result);

@@ -4,6 +4,7 @@ const multer = require('multer');
 const { pool } = require('../../bots/fabuBot/config/database');
 const { getFaBuBotConfig, updateFaBuBotConfigs } = require('../../bots/fabuBot/config');
 const { getVodSourceAggregator } = require('../services/vod-source-aggregator');
+const { logOperation } = require('./operation-logs');
 
 // 配置multer用于内存存储（不保存到磁盘）
 const storage = multer.memoryStorage();
@@ -208,6 +209,7 @@ router.put('/config', authenticateToken, verifyAdmin, async (req, res) => {
       }
     });
     await updateFaBuBotConfigs(filteredConfig);
+    await logOperation(req, 'update', '机器人', 0, 'faBuBot配置', `更新faBuBot配置`);
     res.status(200).json({ success: true, message: 'faBuBot 配置更新成功' });
   } catch (error) {
     res.status(500).json({ message: '更新 faBuBot 配置失败', error: error.message });
@@ -253,6 +255,8 @@ router.post('/commands', authenticateToken, verifyAdmin, async (req, res) => {
       // 重新加载命令列表
       const { updateFaBuBotCommands } = require('../../bots/fabuBot/bot');
       await updateFaBuBotCommands();
+      
+      await logOperation(req, 'add', '机器人', 0, command, `添加命令: ${command}`);
       
       res.status(200).json({ success: true, message: '命令添加成功' });
     } finally {
@@ -325,6 +329,8 @@ router.delete('/commands/:command', authenticateToken, verifyAdmin, async (req, 
       const { updateFaBuBotCommands } = require('../../bots/fabuBot/bot');
       await updateFaBuBotCommands();
       
+      await logOperation(req, 'delete', '机器人', 0, command, `删除命令: ${command}`);
+      
       res.status(200).json({ success: true, message: '命令删除成功' });
     } finally {
       conn.release();
@@ -381,6 +387,8 @@ router.put('/commands/:command', authenticateToken, verifyAdmin, async (req, res
       // 重新加载命令列表
       const { updateFaBuBotCommands } = require('../../bots/fabuBot/bot');
       await updateFaBuBotCommands();
+      
+      await logOperation(req, 'update', '机器人', 0, searchCommand, `更新命令: ${searchCommand}`);
       
       res.status(200).json({ success: true, message: '命令更新成功' });
     } finally {
@@ -880,6 +888,8 @@ router.post('/groups', authenticateToken, verifyAdmin, async (req, res) => {
         [groupId, groupTitle || '未命名群组', groupUsername || null, groupType || 'supergroup']
       );
       
+      await logOperation(req, 'add', '机器人', parseInt(groupId), groupTitle || '未命名群组', `添加群组: ${groupTitle || '未命名群组'}`);
+      
       res.status(200).json({ success: true, message: '群组添加成功' });
     } finally {
       conn.release();
@@ -925,6 +935,8 @@ router.put('/groups/:groupId', authenticateToken, verifyAdmin, async (req, res) 
         `UPDATE fabubot_groups SET ${fields.join(', ')} WHERE group_id = ?`,
         values
       );
+      
+      await logOperation(req, 'update', '机器人', parseInt(groupId), updateData.group_title || `群组${groupId}`, `更新群组信息`);
       
       res.status(200).json({ success: true, message: '群组更新成功' });
     } finally {
@@ -1110,6 +1122,8 @@ router.delete('/groups/:groupId', authenticateToken, verifyAdmin, async (req, re
         return res.status(404).json({ message: '群组不存在' });
       }
       
+      await logOperation(req, 'delete', '机器人', parseInt(groupId), `群组${groupId}`, `删除群组`);
+      
       res.status(200).json({ success: true, message: '群组删除成功' });
     } finally {
       conn.release();
@@ -1232,6 +1246,8 @@ router.post('/groups/:groupId/forbidden-words', authenticateToken, verifyAdmin, 
         [parsedGroupId, word, wordType || 'other', action || 'delete']
       );
       
+      await logOperation(req, 'add', '机器人', parsedGroupId, word, `${isGlobal ? '添加全局违禁词' : '添加群组违禁词'}: ${word}`);
+      
       res.status(200).json({ success: true, message: '违禁词添加成功' });
     } finally {
       conn.release();
@@ -1289,6 +1305,8 @@ router.delete('/groups/:groupId/forbidden-words/:wordId', authenticateToken, ver
       if (result.affectedRows === 0) {
         return res.status(404).json({ message: '违禁词不存在' });
       }
+      
+      await logOperation(req, 'delete', '机器人', parseInt(wordId), `违禁词${wordId}`, `删除违禁词`);
       
       res.status(200).json({ success: true, message: '违禁词删除成功' });
     } finally {
